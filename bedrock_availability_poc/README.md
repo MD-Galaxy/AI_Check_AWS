@@ -1,0 +1,106 @@
+# Bedrock Model Availability Checker (POC)
+
+A small proof-of-concept that checks which AI model providers your AWS
+account actually has access to on Amazon Bedrock — and proves it by sending
+each one a real request, not just checking a listing.
+
+## What it does
+
+1. Lists every foundation model your AWS account/region can see
+   (`bedrock.list_foundation_models()`).
+2. Searches that list for five providers by `modelId` keyword:
+   - **Claude** → `modelId` contains `anthropic`
+   - **DeepSeek** → `modelId` contains `deepseek`
+   - **Qwen** → `modelId` contains `qwen`
+   - **ChatGPT** → `modelId` contains `openai` or `gpt`
+   - **Zhipu GLM** → `modelId` contains `glm` or `zhipu`
+
+   > Note: at the time this POC was originally written, ChatGPT (OpenAI) and
+   > Zhipu GLM were not Bedrock partners and were expected to always show
+   > `NOT AVAILABLE ON BEDROCK`. AWS's model catalog has since grown to
+   > include OpenAI's open-weight models (`openai.gpt-oss-*`) and Zhipu's
+   > GLM (`zai.glm-*`) in some regions — so don't be surprised if your run
+   > shows them as `ACCESSIBLE`. Bedrock's partner catalog changes over
+   > time; treat the script's live output as authoritative, not this doc.
+3. For every provider that **is** listed, picks a best-guess "newest /
+   most capable" match (see `model_matcher.pick_invoke_candidate`; Claude
+   is pinned to `claude-sonnet-5` specifically since Anthropic's newest
+   model on Bedrock, `claude-fable-5`, only supports inference-profile
+   invocation) and actually invokes it via `bedrock-runtime`'s `converse()`
+   API with the prompt `"Reply with exactly one word: OK"`, recording the
+   response text and latency as live proof it works.
+   - If the bare model ID fails specifically because Bedrock requires a
+     cross-region **inference profile** for it, the call is automatically
+     retried once through a matching profile (`bedrock.list_inference_profiles()`)
+     — see `bedrock_client.invoke_model()`. The report's
+     `used_inference_profile` field records whether this happened.
+4. For providers that are **not** listed, skips invocation entirely and
+   marks them `NOT AVAILABLE ON BEDROCK`.
+5. Prints a console table (via `rich`) and writes a full JSON report to
+   `bedrock_availability_report.json`.
+
+## Setup
+
+```bash
+pip install -r requirements.txt
+cp .env.example .env   # optional — defaults to us-east-1
+```
+
+AWS credentials are picked up from the standard boto3 credential chain:
+environment variables (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` /
+`AWS_SESSION_TOKEN`), a named profile (`AWS_PROFILE` in `.env` or your
+shell), `~/.aws/credentials`, or an IAM role. Nothing in this repo prompts
+for or stores credentials.
+
+Your IAM principal needs at least:
+- `bedrock:ListFoundationModels`
+- `bedrock:InvokeModel` (used internally by `converse()`) for whichever
+  models it ends up invoking
+- `bedrock:ListInferenceProfiles` (optional but recommended — without it,
+  the automatic inference-profile retry described below silently can't find
+  a profile and the original error is reported instead)
+
+## Run it
+
+```bash
+python main.py
+```
+
+## Project layout
+
+| File | Purpose |
+|---|---|
+| `main.py` | Entry point — orchestrates list → match → invoke → report |
+| `bedrock_client.py` | boto3 wrapper: `list_foundation_models()`, `invoke_model()` (Converse API, with automatic inference-profile retry), `list_inference_profiles()` |
+| `model_matcher.py` | Keyword matching logic that groups models by provider, plus `pick_invoke_candidate()` to choose which matched model to invoke |
+| `config.py` | Region / prompt / other settings, loaded from env vars or `.env` |
+| `requirements.txt` | `boto3`, `rich`, `python-dotenv` |
+| `bedrock_availability_report.json` | Generated on each run — full machine-readable result |
+
+## Reading the summary
+
+```
+Claude       -> ACCESSIBLE                    (responded in 0.8s: "OK")
+DeepSeek     -> ACCESSIBLE                    (responded in 1.1s: "OK")
+Qwen         -> LISTED BUT FAILED TO INVOKE   (AccessDeniedException)
+ChatGPT      -> NOT AVAILABLE ON BEDROCK
+Zhipu GLM    -> NOT AVAILABLE ON BEDROCK
+```
+
+| Status | Meaning |
+|---|---|
+| `ACCESSIBLE` | The model is listed **and** responded successfully to a real invocation. Latency and the returned text are shown as proof. If it only worked via a cross-region inference profile, `used_inference_profile` in the JSON report names the profile used. |
+| `LISTED BUT FAILED TO INVOKE` | Bedrock's model catalog shows this provider, but the actual `converse()` call failed — e.g. `AccessDeniedException` (no model-access grant, or — as seen in testing — `INVALID_PAYMENT_INSTRUMENT` meaning the account has no valid payment method on file for the AWS Marketplace subscription this model requires), `ResourceNotFoundException` (a legacy model needs reactivation), `ValidationException` (a required inference profile wasn't found, or another request-shape issue), `ThrottlingException`, or similar. This is a **different failure mode** than "not offered" — the account/model is one step away from working, not fundamentally unavailable. |
+| `NOT AVAILABLE ON BEDROCK` | No model from this provider appears in `list_foundation_models()` at all for this account/region. |
+
+If credentials are missing or invalid entirely (not just missing model
+access), the script exits early with a clear, actionable error message
+instead of a stack trace.
+
+## Notes
+
+- This is a proof of concept — it invokes only the **first** matching model
+  per provider, uses a fixed one-word test prompt, and keeps error handling
+  simple. It is not meant for production monitoring.
+- Model availability varies by AWS region — if everything shows as
+  `NOT AVAILABLE ON BEDROCK`, double-check `AWS_REGION` in your `.env`.

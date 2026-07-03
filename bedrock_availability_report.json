@@ -1,0 +1,105 @@
+{
+  "timestamp": "2026-07-03T15:31:12.808254+00:00",
+  "region": "us-east-1",
+  "total_models_listed": 125,
+  "providers": {
+    "Claude": {
+      "listed": true,
+      "matched_model_ids": [
+        "anthropic.claude-3-haiku-20240307-v1:0",
+        "anthropic.claude-3-haiku-20240307-v1:0:200k",
+        "anthropic.claude-3-haiku-20240307-v1:0:48k",
+        "anthropic.claude-3-sonnet-20240229-v1:0",
+        "anthropic.claude-3-sonnet-20240229-v1:0:200k",
+        "anthropic.claude-3-sonnet-20240229-v1:0:28k",
+        "anthropic.claude-fable-5",
+        "anthropic.claude-haiku-4-5-20251001-v1:0",
+        "anthropic.claude-opus-4-1-20250805-v1:0",
+        "anthropic.claude-opus-4-5-20251101-v1:0",
+        "anthropic.claude-opus-4-6-v1",
+        "anthropic.claude-opus-4-7",
+        "anthropic.claude-opus-4-8",
+        "anthropic.claude-sonnet-4-20250514-v1:0",
+        "anthropic.claude-sonnet-4-5-20250929-v1:0",
+        "anthropic.claude-sonnet-4-6",
+        "anthropic.claude-sonnet-5"
+      ],
+      "invoked_model_id": "anthropic.claude-sonnet-5",
+      "status": "LISTED BUT FAILED TO INVOKE",
+      "latency_seconds": 0.392,
+      "response_text": null,
+      "error": "AccessDeniedException",
+      "error_message": "Model access is denied due to INVALID_PAYMENT_INSTRUMENT:A valid payment instrument must be provided.. Your AWS Marketplace subscription for this model cannot be completed at this time. If you recently fixed this issue, try again after 2 minutes.",
+      "used_inference_profile": "us.anthropic.claude-sonnet-5"
+    },
+    "DeepSeek": {
+      "listed": true,
+      "matched_model_ids": [
+        "deepseek.r1-v1:0",
+        "deepseek.v3.2"
+      ],
+      "invoked_model_id": "deepseek.v3.2",
+      "status": "ACCESSIBLE",
+      "latency_seconds": 1.61,
+      "response_text": "OK",
+      "error": null,
+      "error_message": null,
+      "used_inference_profile": null
+    },
+    "Qwen": {
+      "listed": true,
+      "matched_model_ids": [
+        "qwen.qwen3-32b-v1:0",
+        "qwen.qwen3-coder-30b-a3b-v1:0",
+        "qwen.qwen3-coder-next",
+        "qwen.qwen3-next-80b-a3b",
+        "qwen.qwen3-vl-235b-a22b"
+      ],
+      "invoked_model_id": "qwen.qwen3-vl-235b-a22b",
+      "status": "ACCESSIBLE",
+      "latency_seconds": 1.417,
+      "response_text": "OK",
+      "error": null,
+      "error_message": null,
+      "used_inference_profile": null
+    },
+    "ChatGPT": {
+      "listed": true,
+      "matched_model_ids": [
+        "openai.gpt-oss-120b-1:0",
+        "openai.gpt-oss-20b-1:0",
+        "openai.gpt-oss-safeguard-120b",
+        "openai.gpt-oss-safeguard-20b"
+      ],
+      "invoked_model_id": "openai.gpt-oss-120b-1:0",
+      "status": "ACCESSIBLE",
+      "latency_seconds": 1.32,
+      "response_text": "",
+      "error": null,
+      "error_message": null,
+      "used_inference_profile": null
+    },
+    "Zhipu GLM": {
+      "listed": true,
+      "matched_model_ids": [
+        "zai.glm-4.7",
+        "zai.glm-4.7-flash",
+        "zai.glm-5"
+      ],
+      "invoked_model_id": "zai.glm-5",
+      "status": "ACCESSIBLE",
+      "latency_seconds": 1.264,
+      "response_text": "OK",
+      "error": null,
+      "error_message": null,
+      "used_inference_profile": null
+    }
+  },
+  "summary": {
+    "Claude": "LISTED BUT FAILED TO INVOKE",
+    "DeepSeek": "ACCESSIBLE",
+    "Qwen": "ACCESSIBLE",
+    "ChatGPT": "ACCESSIBLE",
+    "Zhipu GLM": "ACCESSIBLE"
+  }
+}
