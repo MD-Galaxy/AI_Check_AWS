@@ -11,11 +11,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# AWS region to query. Defaults to us-east-1, which has the broadest
-# Bedrock foundation-model coverage.
-AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+# AWS region to query.
+AWS_REGION = os.getenv("AWS_REGION", "ap-south-1")
 
-# Optional named AWS CLI profile. If unset, boto3 falls back to the default
+# Explicit AWS credentials, provided directly via .env. When both access key
+# and secret are set, they take priority over everything else below.
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID") or None
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY") or None
+# Only needed alongside temporary credentials (e.g. an assumed role / SSO
+# session) — leave unset for a normal long-lived access key pair.
+AWS_SESSION_TOKEN = os.getenv("AWS_SESSION_TOKEN") or None
+
+# Optional named AWS CLI profile, used only if explicit access keys above
+# are not set. If neither is set, boto3 falls back to its own default
 # credential chain (env vars, shared credentials file, IAM role, SSO, etc.)
 AWS_PROFILE = os.getenv("AWS_PROFILE") or None
 

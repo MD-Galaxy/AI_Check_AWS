@@ -17,7 +17,12 @@ from rich.table import Table
 import bedrock_client
 import config
 from bedrock_client import BedrockAuthError
-from model_matcher import PROVIDER_KEYWORDS, match_providers, pick_invoke_candidate
+from model_matcher import (
+    PROVIDER_KEYWORDS,
+    list_provider_names,
+    match_providers,
+    pick_invoke_candidate,
+)
 
 console = Console()
 
@@ -57,11 +62,20 @@ def print_summary_table(results):
     console.print(table)
 
 
-def write_json_report(results, list_check_count):
+def print_provider_names(provider_names):
+    console.print(
+        f"\n[bold]All AI service providers available in this region "
+        f"({len(provider_names)}):[/bold]"
+    )
+    console.print("  " + ", ".join(provider_names))
+
+
+def write_json_report(results, list_check_count, provider_names):
     report = {
         "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "region": config.AWS_REGION,
         "total_models_listed": list_check_count,
+        "all_providers_in_region": provider_names,
         "providers": results,
         "summary": {
             provider: info["status"] for provider, info in results.items()
@@ -99,6 +113,9 @@ def main():
         sys.exit(1)
 
     console.print(f"Found [bold]{len(all_models)}[/bold] total foundation models.\n")
+
+    provider_names = list_provider_names(all_models)
+    print_provider_names(provider_names)
 
     matches = match_providers(all_models, PROVIDER_KEYWORDS)
     results = {}
@@ -144,7 +161,7 @@ def main():
 
     print_summary_table(results)
     print_final_summary_lines(results)
-    write_json_report(results, len(all_models))
+    write_json_report(results, len(all_models), provider_names)
 
 
 if __name__ == "__main__":

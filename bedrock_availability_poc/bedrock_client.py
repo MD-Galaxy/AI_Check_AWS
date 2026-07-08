@@ -36,8 +36,18 @@ _inference_profiles_cache = None
 
 def _session():
     kwargs = {"region_name": config.AWS_REGION}
-    if config.AWS_PROFILE:
+
+    if config.AWS_ACCESS_KEY_ID and config.AWS_SECRET_ACCESS_KEY:
+        # Explicit .env credentials take priority over everything else.
+        kwargs["aws_access_key_id"] = config.AWS_ACCESS_KEY_ID
+        kwargs["aws_secret_access_key"] = config.AWS_SECRET_ACCESS_KEY
+        if config.AWS_SESSION_TOKEN:
+            kwargs["aws_session_token"] = config.AWS_SESSION_TOKEN
+    elif config.AWS_PROFILE:
         kwargs["profile_name"] = config.AWS_PROFILE
+    # Otherwise: no override — boto3 falls back to its own default
+    # credential chain (env vars, shared credentials file, IAM role, etc.)
+
     return boto3.Session(**kwargs)
 
 

@@ -8,7 +8,11 @@ each one a real request, not just checking a listing.
 
 1. Lists every foundation model your AWS account/region can see
    (`bedrock.list_foundation_models()`).
-2. Searches that list for five providers by `modelId` keyword:
+2. Prints the full, distinct set of AI service provider **names** available
+   in the selected region (e.g. `Amazon, Anthropic, Cohere, DeepSeek, ...`)
+   — every provider Bedrock exposes there, not just the five checked below.
+   This also lands in the JSON report as `all_providers_in_region`.
+3. Searches that list for five specific providers by `modelId` keyword:
    - **Claude** → `modelId` contains `anthropic`
    - **DeepSeek** → `modelId` contains `deepseek`
    - **Qwen** → `modelId` contains `qwen`
@@ -22,7 +26,7 @@ each one a real request, not just checking a listing.
    > GLM (`zai.glm-*`) in some regions — so don't be surprised if your run
    > shows them as `ACCESSIBLE`. Bedrock's partner catalog changes over
    > time; treat the script's live output as authoritative, not this doc.
-3. For every provider that **is** listed, picks a best-guess "newest /
+4. For every provider that **is** listed, picks a best-guess "newest /
    most capable" match (see `model_matcher.pick_invoke_candidate`; Claude
    is pinned to `claude-sonnet-5` specifically since Anthropic's newest
    model on Bedrock, `claude-fable-5`, only supports inference-profile
@@ -34,23 +38,34 @@ each one a real request, not just checking a listing.
      retried once through a matching profile (`bedrock.list_inference_profiles()`)
      — see `bedrock_client.invoke_model()`. The report's
      `used_inference_profile` field records whether this happened.
-4. For providers that are **not** listed, skips invocation entirely and
+5. For providers that are **not** listed, skips invocation entirely and
    marks them `NOT AVAILABLE ON BEDROCK`.
-5. Prints a console table (via `rich`) and writes a full JSON report to
+6. Prints a console table (via `rich`) and writes a full JSON report to
    `bedrock_availability_report.json`.
 
 ## Setup
 
 ```bash
 pip install -r requirements.txt
-cp .env.example .env   # optional — defaults to us-east-1
+cp .env.example .env
 ```
 
-AWS credentials are picked up from the standard boto3 credential chain:
-environment variables (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` /
-`AWS_SESSION_TOKEN`), a named profile (`AWS_PROFILE` in `.env` or your
-shell), `~/.aws/credentials`, or an IAM role. Nothing in this repo prompts
-for or stores credentials.
+Edit `.env` to set your region and credentials. Three ways to supply
+credentials, checked in this order:
+
+1. **Explicit keys in `.env`** — set `AWS_ACCESS_KEY_ID` and
+   `AWS_SECRET_ACCESS_KEY` (plus `AWS_SESSION_TOKEN` if you're using
+   temporary credentials). If both are set, they're used regardless of
+   anything else configured on the system.
+2. **A named profile** — set `AWS_PROFILE` in `.env` to reuse a profile
+   already configured in `~/.aws/credentials`. Ignored if explicit keys
+   (option 1) are set.
+3. **System default** — if neither of the above is set, falls back to
+   boto3's own default credential chain (env vars already in your shell,
+   `~/.aws/credentials`, an IAM role, SSO, etc.)
+
+`.env` is listed in `.gitignore` and won't be committed — keep real
+credentials out of version control.
 
 Your IAM principal needs at least:
 - `bedrock:ListFoundationModels`
@@ -72,7 +87,7 @@ python main.py
 |---|---|
 | `main.py` | Entry point — orchestrates list → match → invoke → report |
 | `bedrock_client.py` | boto3 wrapper: `list_foundation_models()`, `invoke_model()` (Converse API, with automatic inference-profile retry), `list_inference_profiles()` |
-| `model_matcher.py` | Keyword matching logic that groups models by provider, plus `pick_invoke_candidate()` to choose which matched model to invoke |
+| `model_matcher.py` | Keyword matching logic that groups models by provider, `pick_invoke_candidate()` to choose which matched model to invoke, and `list_provider_names()` for the full provider-name listing |
 | `config.py` | Region / prompt / other settings, loaded from env vars or `.env` |
 | `requirements.txt` | `boto3`, `rich`, `python-dotenv` |
 | `bedrock_availability_report.json` | Generated on each run — full machine-readable result |

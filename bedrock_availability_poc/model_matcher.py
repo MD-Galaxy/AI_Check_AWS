@@ -88,3 +88,15 @@ def match_providers(model_summaries, keywords=None):
         matches[provider].sort(key=lambda s: s.get("modelId", ""))
 
     return matches
+
+
+def list_provider_names(model_summaries):
+    """
+    Return every distinct Bedrock "providerName" (e.g. "Anthropic",
+    "Amazon", "DeepSeek", "Qwen", "Google") present in a region, sorted
+    alphabetically. This is every provider Bedrock exposes here — a
+    superset of the five providers PROVIDER_KEYWORDS specifically checks.
+    """
+    names = {summary.get("providerName") for summary in model_summaries}
+    names.discard(None)
+    return sorted(names)
