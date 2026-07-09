@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-07-07T10:45:43.921902+00:00",
+  "timestamp": "2026-07-09T09:48:43.917109+00:00",
   "region": "ap-southeast-1",
   "total_models_listed": 24,
   "all_providers_in_region": [
@@ -31,7 +31,7 @@
       ],
       "invoked_model_id": "anthropic.claude-sonnet-5",
       "status": "LISTED BUT FAILED TO INVOKE",
-      "latency_seconds": 0.202,
+      "latency_seconds": 0.096,
       "response_text": null,
       "error": "AccessDeniedException",
       "error_message": "Model access is denied due to INVALID_PAYMENT_INSTRUMENT:A valid payment instrument must be provided.. Your AWS Marketplace subscription for this model cannot be completed at this time. If you recently fixed this issue, try again after 2 minutes.",
@@ -80,6 +80,14 @@
       "error": null,
       "error_message": null,
       "used_inference_profile": null
+    },
+    "Manual Claude API Access": {
+      "model": "claude-sonnet-5",
+      "status": "ACCESSIBLE",
+      "latency_seconds": 1.853,
+      "response_text": "OK",
+      "error": null,
+      "error_message": null
     }
   },
   "summary": {
@@ -87,6 +95,7 @@
     "DeepSeek": "NOT AVAILABLE ON BEDROCK",
     "Qwen": "NOT AVAILABLE ON BEDROCK",
     "ChatGPT": "NOT AVAILABLE ON BEDROCK",
-    "Zhipu GLM": "NOT AVAILABLE ON BEDROCK"
+    "Zhipu GLM": "NOT AVAILABLE ON BEDROCK",
+    "Manual Claude API Access": "ACCESSIBLE"
   }
 }

@@ -36,3 +36,11 @@ TEST_MAX_TOKENS = int(os.getenv("TEST_MAX_TOKENS", "16"))
 
 # Where the JSON report is written.
 REPORT_PATH = os.getenv("REPORT_PATH", "bedrock_availability_report.json")
+
+# Direct Anthropic API key, for the "Manual Claude API Access" check — calls
+# Claude via Anthropic's own API directly, bypassing AWS Bedrock entirely.
+# Leave unset to skip this check.
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY") or None
+
+# Model used for the direct Anthropic API check.
+ANTHROPIC_TEST_MODEL = os.getenv("ANTHROPIC_TEST_MODEL", "claude-sonnet-5")

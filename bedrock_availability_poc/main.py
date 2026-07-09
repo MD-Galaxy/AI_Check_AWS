@@ -14,6 +14,7 @@ import sys
 from rich.console import Console
 from rich.table import Table
 
+import anthropic_client
 import bedrock_client
 import config
 from bedrock_client import BedrockAuthError
@@ -29,11 +30,19 @@ console = Console()
 STATUS_ACCESSIBLE = "ACCESSIBLE"
 STATUS_LISTED_FAILED = "LISTED BUT FAILED TO INVOKE"
 STATUS_NOT_AVAILABLE = "NOT AVAILABLE ON BEDROCK"
+# Used only by the direct Anthropic API check at the end of the run — it has
+# no Bedrock "listing" step, so a plain failure doesn't fit STATUS_LISTED_FAILED.
+STATUS_FAILED = "FAILED TO INVOKE"
+STATUS_NOT_CONFIGURED = "NOT CONFIGURED"
+
+MANUAL_CLAUDE_LABEL = "Manual Claude API Access"
 
 STATUS_STYLE = {
     STATUS_ACCESSIBLE: "bold green",
     STATUS_LISTED_FAILED: "bold yellow",
     STATUS_NOT_AVAILABLE: "dim",
+    STATUS_FAILED: "bold yellow",
+    STATUS_NOT_CONFIGURED: "dim",
 }
 
 
@@ -51,8 +60,10 @@ def print_summary_table(results):
             detail = f"responded in {info['latency_seconds']}s: \"{info['response_text']}\""
             if info.get("used_inference_profile"):
                 detail += f"\n(via inference profile {info['used_inference_profile']})"
-        elif status == STATUS_LISTED_FAILED:
+        elif status in (STATUS_LISTED_FAILED, STATUS_FAILED):
             detail = f"{info['error']}: {info['error_message']}"
+        elif status == STATUS_NOT_CONFIGURED:
+            detail = info.get("error_message") or "-"
         else:
             detail = "-"
 
@@ -95,8 +106,10 @@ def print_final_summary_lines(results):
             extra = f"(responded in {info['latency_seconds']}s: \"{info['response_text']}\")"
             if info.get("used_inference_profile"):
                 extra += f" [via inference profile {info['used_inference_profile']}]"
-        elif status == STATUS_LISTED_FAILED:
+        elif status in (STATUS_LISTED_FAILED, STATUS_FAILED):
             extra = f"({info['error']})"
+        elif status == STATUS_NOT_CONFIGURED:
+            extra = f"({info.get('error_message', '')})"
         else:
             extra = ""
         console.print(f"  {provider:<{width}} -> {status:<28} {extra}")
@@ -104,10 +117,15 @@ def print_final_summary_lines(results):
 
 def run_check():
     """
-    Core check, with no printing/file I/O: fetch models, match providers,
-    invoke one model per matched provider. Returns
-    (results, provider_names, total_models_listed). Raises BedrockAuthError
-    on missing/invalid credentials, same as the individual calls it wraps.
+    Core check, with no printing/file I/O: fetch models, match Bedrock
+    providers, invoke one model per matched provider, then run the direct
+    Anthropic API check ("Manual Claude API Access") as an extra entry.
+    Returns (results, provider_names, total_models_listed).
+
+    Used by both main() (CLI) and app.py (Flask) so there's one source of
+    truth for both. Raises BedrockAuthError on missing/invalid Bedrock
+    credentials — that only affects the Bedrock half; the direct Anthropic
+    check has its own independent failure handling and never raises.
     """
     all_models = bedrock_client.list_foundation_models()
     provider_names = list_provider_names(all_models)
@@ -147,6 +165,24 @@ def run_check():
             "used_inference_profile": invocation["used_inference_profile"],
         }
 
+    direct = anthropic_client.invoke_claude_direct()
+
+    if not direct["configured"]:
+        direct_status = STATUS_NOT_CONFIGURED
+    elif direct["ok"]:
+        direct_status = STATUS_ACCESSIBLE
+    else:
+        direct_status = STATUS_FAILED
+
+    results[MANUAL_CLAUDE_LABEL] = {
+        "model": config.ANTHROPIC_TEST_MODEL,
+        "status": direct_status,
+        "latency_seconds": direct["latency_seconds"],
+        "response_text": direct["text"],
+        "error": direct["error"],
+        "error_message": direct["error_message"],
+    }
+
     return results, provider_names, len(all_models)
 
 
@@ -162,6 +198,7 @@ def main():
 
     console.print(f"Found [bold]{list_check_count}[/bold] total foundation models.\n")
     print_provider_names(provider_names)
+
     print_summary_table(results)
     print_final_summary_lines(results)
     write_json_report(results, list_check_count, provider_names)
