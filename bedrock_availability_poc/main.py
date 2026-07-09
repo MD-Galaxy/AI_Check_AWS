@@ -102,20 +102,15 @@ def print_final_summary_lines(results):
         console.print(f"  {provider:<{width}} -> {status:<28} {extra}")
 
 
-def main():
-    console.print(f"[bold]Region:[/bold] {config.AWS_REGION}")
-    console.print("Fetching foundation models visible to this account...\n")
-
-    try:
-        all_models = bedrock_client.list_foundation_models()
-    except BedrockAuthError as exc:
-        console.print(f"\n[bold red]Credential/permission error:[/bold red] {exc}")
-        sys.exit(1)
-
-    console.print(f"Found [bold]{len(all_models)}[/bold] total foundation models.\n")
-
+def run_check():
+    """
+    Core check, with no printing/file I/O: fetch models, match providers,
+    invoke one model per matched provider. Returns
+    (results, provider_names, total_models_listed). Raises BedrockAuthError
+    on missing/invalid credentials, same as the individual calls it wraps.
+    """
+    all_models = bedrock_client.list_foundation_models()
     provider_names = list_provider_names(all_models)
-    print_provider_names(provider_names)
 
     matches = match_providers(all_models, PROVIDER_KEYWORDS)
     results = {}
@@ -137,14 +132,7 @@ def main():
             continue
 
         invoke_model_id = pick_invoke_candidate(provider, model_list)
-        console.print(f"[cyan]{provider}[/cyan]: listed on Bedrock ({len(model_ids)} model(s)), invoking `{invoke_model_id}`...")
-
-        try:
-            invocation = bedrock_client.invoke_model(invoke_model_id)
-        except BedrockAuthError as exc:
-            console.print(f"\n[bold red]Credential/permission error during invocation:[/bold red] {exc}")
-            sys.exit(1)
-
+        invocation = bedrock_client.invoke_model(invoke_model_id)
         status = STATUS_ACCESSIBLE if invocation["ok"] else STATUS_LISTED_FAILED
 
         results[provider] = {
@@ -159,9 +147,24 @@ def main():
             "used_inference_profile": invocation["used_inference_profile"],
         }
 
+    return results, provider_names, len(all_models)
+
+
+def main():
+    console.print(f"[bold]Region:[/bold] {config.AWS_REGION}")
+    console.print("Fetching foundation models visible to this account...\n")
+
+    try:
+        results, provider_names, list_check_count = run_check()
+    except BedrockAuthError as exc:
+        console.print(f"\n[bold red]Credential/permission error:[/bold red] {exc}")
+        sys.exit(1)
+
+    console.print(f"Found [bold]{list_check_count}[/bold] total foundation models.\n")
+    print_provider_names(provider_names)
     print_summary_table(results)
     print_final_summary_lines(results)
-    write_json_report(results, len(all_models), provider_names)
+    write_json_report(results, list_check_count, provider_names)
 
 
 if __name__ == "__main__":
