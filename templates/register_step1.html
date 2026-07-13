@@ -1,0 +1,58 @@
+{% extends "auth_base.html" %}
+{% block title %}Create account — EmailPOC{% endblock %}
+
+{% block content %}
+<div class="step-indicator">
+  <div class="step-dot active">1</div>
+  <div class="step-line"></div>
+  <div class="step-dot">2</div>
+  <div class="step-line"></div>
+  <div class="step-dot">3</div>
+</div>
+
+<div class="auth-title">Create your account</div>
+<div class="auth-sub">Step 1 of 3 — your details</div>
+
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+
+<form method="post" action="{{ base_path }}/register">
+  <div class="form-grid">
+    <div class="form-group">
+      <label for="first_name">First name</label>
+      <input type="text" id="first_name" name="first_name" required autofocus
+             value="{{ first_name or '' }}" placeholder="James">
+    </div>
+    <div class="form-group">
+      <label for="last_name">Last name</label>
+      <input type="text" id="last_name" name="last_name" required
+             value="{{ last_name or '' }}" placeholder="Whitfield">
+    </div>
+    <div class="form-group span2">
+      <label for="personal_email">Email <span class="label-hint">(used to log in)</span></label>
+      <input type="email" id="personal_email" name="personal_email" required
+             value="{{ personal_email or '' }}" placeholder="you@example.com">
+    </div>
+    <div class="form-group">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" required minlength="8"
+             placeholder="At least 8 characters">
+    </div>
+    <div class="form-group">
+      <label for="confirm_password">Confirm password</label>
+      <input type="password" id="confirm_password" name="confirm_password" required minlength="8"
+             placeholder="Re-enter password">
+    </div>
+  </div>
+  <div style="margin-top: 20px;">
+    <button type="submit" class="btn btn-primary btn-block">Continue</button>
+  </div>
+</form>
+{% endblock %}
+
+{% block footer %}
+<div class="auth-footer">
+  Already have an account? <a href="{{ base_path }}/login">Log in</a>
+</div>
+{% endblock %}

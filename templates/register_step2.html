@@ -1,0 +1,27 @@
+{% extends "auth_base.html" %}
+{% block title %}Confirm your name — EmailPOC{% endblock %}
+
+{% block content %}
+<div class="step-indicator">
+  <div class="step-dot done">✓</div>
+  <div class="step-line done"></div>
+  <div class="step-dot active">2</div>
+  <div class="step-line"></div>
+  <div class="step-dot">3</div>
+</div>
+
+<div class="auth-title">Confirm your name</div>
+<div class="auth-sub">Step 2 of 3 — this is how you'll appear on every RFQ you send</div>
+
+<div style="background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 16px 18px; margin-bottom: 20px; text-align: center;">
+  <div style="font-size: 20px; font-weight: 700;">{{ user.first_name }} {{ user.last_name }}</div>
+  <div class="text-sm text-muted" style="margin-top: 2px;">{{ user.personal_email }}</div>
+</div>
+
+<form method="post" action="{{ base_path }}/register/confirm-name">
+  <button type="submit" class="btn btn-primary btn-block">Confirm &amp; continue</button>
+</form>
+<div style="text-align: center; margin-top: 12px;">
+  <a href="{{ base_path }}/register" class="text-sm">Edit name</a>
+</div>
+{% endblock %}

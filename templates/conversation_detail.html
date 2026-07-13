@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+{% block title %}Conversation {{ conversation.conv_id }} — EmailPOC{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+  <a href="{{ base_path }}/tracking">Tracking</a>
+  <span class="breadcrumb-sep">›</span>
+  <span class="breadcrumb-cur font-mono">{{ conversation.project_name or conversation.conv_id }}</span>
+</div>
+
+{% if success %}
+<div class="alert alert-success">✅ Email sent successfully! Awaiting supplier reply.</div>
+{% endif %}
+
+<div style="display:flex; justify-content:flex-end; margin-bottom:16px;">
+  <form method="post" action="{{ base_path }}/tracking/{{ conversation.conv_id }}/delete"
+        onsubmit="return confirm('Delete this conversation and all its messages? This cannot be undone.');">
+    <button type="submit" class="btn btn-danger btn-sm">🗑️ Delete Conversation</button>
+  </form>
+</div>
+
+<!-- Conversation Info Bar -->
+<div class="conv-info-bar">
+  <div class="conv-info-item">
+    <div class="conv-info-label">Thread ID</div>
+    <div class="conv-info-value font-mono">{{ conversation.thread_id or conversation.conv_id }}</div>
+  </div>
+  {% if conversation.project_id %}
+  <div class="conv-info-item">
+    <div class="conv-info-label">Conversation ID (Product)</div>
+    <div class="conv-info-value" style="font-size:12px;">
+      <div style="font-weight:600;">{{ conversation.project_name or '—' }}</div>
+      <div class="font-mono" style="font-size:10px; color:var(--txt2); word-break:break-all;">{{ conversation.project_id }}</div>
+    </div>
+  </div>
+  {% else %}
+  <div class="conv-info-item">
+    <div class="conv-info-label">Conv ID</div>
+    <div class="conv-info-value font-mono">{{ conversation.conv_id }}</div>
+  </div>
+  {% endif %}
+  <div class="conv-info-item">
+    <div class="conv-info-label">Supplier</div>
+    <div class="conv-info-value">{{ conversation.supplier_name or conversation.supplier_email }}</div>
+  </div>
+  <div class="conv-info-item">
+    <div class="conv-info-label">Supplier Email</div>
+    <div class="conv-info-value" style="font-size:13px;">{{ conversation.supplier_email }}</div>
+  </div>
+  <div class="conv-info-item">
+    <div class="conv-info-label">Product</div>
+    <div class="conv-info-value">{{ conversation.product_name or '—' }}</div>
+  </div>
+  <div class="conv-info-item">
+    <div class="conv-info-label">Quantity / Price</div>
+    <div class="conv-info-value">
+      {% if conversation.quantity %}{{ conversation.quantity }} units{% else %}—{% endif %}
+      {% if conversation.target_price %} @ {{ conversation.target_price }}{% endif %}
+    </div>
+  </div>
+  <div class="conv-info-item">
+    <div class="conv-info-label">Status</div>
+    <div class="conv-info-value">
+      {% if conversation.status == 'replied' %}
+        <span class="badge badge-replied">Replied</span>
+      {% elif conversation.status == 'declined' %}
+        <span class="badge badge-declined">Declined</span>
+      {% else %}
+        <span class="badge badge-open">Open</span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="conv-info-item">
+    <div class="conv-info-label">Replies</div>
+    <div class="conv-info-value">{{ conversation.reply_count or 0 }}</div>
+  </div>
+  <div class="conv-info-item">
+    <div class="conv-info-label">Dynamic Address</div>
+    <div class="conv-info-value font-mono" style="font-size:11px; word-break:break-all;">{{ conversation.email_address }}</div>
+  </div>
+</div>
+
+<!-- Thread Header -->
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:8px;">
+  <div style="font-size:15px; font-weight:600;">
+    Email Thread
+    <span style="font-weight:400; color:var(--txt2); font-size:13px;">
+      ({{ thread | length }} message{% if thread | length != 1 %}s{% endif %})
+    </span>
+  </div>
+  <div class="flex gap-8">
+    <span class="badge badge-sent" style="font-size:11px;">■ Sent</span>
+    <span class="badge badge-received" style="font-size:11px;">■ Received</span>
+  </div>
+</div>
+
+{% if thread %}
+<div class="thread">
+  {% for email in thread %}
+  <div class="email-card {{ email.direction }}">
+
+    <!-- Header row -->
+    <div class="email-card-header">
+      <div class="email-card-meta">
+        <div class="email-card-parties">
+          <span class="email-card-from">From: {{ email.from_email }}</span>
+          <span class="email-card-to">To: {{ email.to_email }}</span>
+        </div>
+      </div>
+      <div class="email-card-time" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+        <span class="badge {% if email.direction == 'sent' %}badge-sent{% else %}badge-received{% endif %}" style="font-size:11px;">
+          {% if email.direction == 'sent' %}↑ Sent{% else %}↓ Received{% endif %}
+        </span>
+        {% if email.email_type == 'reply' %}
+          <span class="badge" style="font-size:10px; background:#e0f0ff; color:#0066cc; border:1px solid #b3d7ff;">↩ Reply</span>
+        {% elif email.email_type == 'forwarded' %}
+          <span class="badge" style="font-size:10px; background:#fff3e0; color:#cc6600; border:1px solid #ffd699;">⇒ Forwarded</span>
+        {% elif email.email_type == 'new_thread' %}
+          <span class="badge" style="font-size:10px; background:#e6f9e6; color:#1a7a1a; border:1px solid #99d699;">✉ New Thread</span>
+        {% endif %}
+        <span>
+          {% set ts = email.sent_at or email.received_at or '' %}
+          {{ ts[:16].replace('T', ' ') if ts else '—' }} UTC
+        </span>
+      </div>
+    </div>
+
+    <!-- Subject -->
+    <div class="email-card-subject">{{ email.subject or '(no subject)' }}</div>
+
+    <!-- Body -->
+    <div class="email-card-body">
+      {% if email.body_html and email.direction == 'received' %}
+        <!-- HTML preview toggle -->
+        <div style="display:flex; gap:8px; margin-bottom:10px;">
+          <button onclick="toggleView(this, 'html-{{ loop.index }}')"
+                  class="btn btn-primary btn-sm" data-mode="html">
+            Show HTML
+          </button>
+          <button onclick="toggleView(this, 'text-{{ loop.index }}')"
+                  class="btn btn-secondary btn-sm" data-mode="text">
+            Plain Text
+          </button>
+        </div>
+        <div id="text-{{ loop.index }}" class="email-text-body" style="display:none;">{{ email.body_text or '(no plain text content)' }}</div>
+        <div id="html-{{ loop.index }}" class="email-html-body-wrap">
+          <iframe srcdoc="{{ email.body_html | e }}" sandbox="allow-same-origin"
+                  onload="autoHeight(this)"></iframe>
+        </div>
+      {% elif email.body_html and email.direction == 'sent' %}
+        <div style="display:flex; gap:8px; margin-bottom:10px;">
+          <button onclick="toggleView(this, 'html-{{ loop.index }}')"
+                  class="btn btn-primary btn-sm" data-mode="html">
+            HTML Preview
+          </button>
+        </div>
+        <div id="html-{{ loop.index }}" class="email-html-body-wrap">
+          <iframe srcdoc="{{ email.body_html | e }}" sandbox="allow-same-origin"
+                  onload="autoHeight(this)"></iframe>
+        </div>
+      {% elif email.body_text %}
+        <div class="email-text-body">{{ email.body_text }}</div>
+      {% else %}
+        <div class="text-sm text-muted">(no body content)</div>
+      {% endif %}
+    </div>
+
+    <!-- Attachments -->
+    {% if email.attachments %}
+    <div class="attachments-section">
+      <div class="attachments-label">📎 {{ email.attachments | length }} Attachment{% if email.attachments | length != 1 %}s{% endif %}</div>
+      <div class="attachments-list">
+        {% for att in email.attachments %}
+        <a href="{{ att.url }}" target="_blank" class="attachment-chip">
+          <span class="icon">
+            {% if 'image' in att.content_type %}🖼{% elif 'pdf' in att.content_type %}📄{% else %}📎{% endif %}
+          </span>
+          {{ att.filename }}
+          {% if att.size %}
+            <span style="color:var(--txt2);">
+              ({% if att.size < 1024 %}{{ att.size }}B
+              {% elif att.size < 1048576 %}{{ (att.size // 1024) }}KB
+              {% else %}{{ (att.size // 1048576) }}MB{% endif %})
+            </span>
+          {% endif %}
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Security info for received -->
+    {% if email.direction == 'received' and (email.dkim or email.spf or email.spam_score) %}
+    <div style="padding: 8px 16px; background: var(--bg); border-top: 1px solid var(--border); display:flex; gap:16px; flex-wrap:wrap;">
+      {% if email.spam_score %}
+      <span class="text-xs text-muted">Spam score: {{ email.spam_score }}</span>
+      {% endif %}
+      {% if email.dkim %}
+      <span class="text-xs text-muted">DKIM: {{ email.dkim }}</span>
+      {% endif %}
+      {% if email.spf %}
+      <span class="text-xs text-muted">SPF: {{ email.spf }}</span>
+      {% endif %}
+    </div>
+    {% endif %}
+
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="card">
+  <div class="card-body">
+    <div class="empty-state">
+      <div class="empty-icon">📬</div>
+      <div class="empty-title">No messages yet</div>
+      <div class="empty-sub">The conversation was created but no emails are recorded.</div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<script>
+function toggleView(btn, targetId) {
+  var target = document.getElementById(targetId);
+  if (!target) return;
+  var siblings = btn.parentNode.querySelectorAll("button");
+  var isVisible = target.style.display !== "none";
+
+  // For sent HTML (single toggle button), just toggle
+  if (siblings.length === 1) {
+    target.style.display = isVisible ? "none" : "";
+    btn.textContent = isVisible ? "HTML Preview" : "Hide Preview";
+    return;
+  }
+
+  // For received (two buttons: HTML + text)
+  var mode = btn.dataset.mode;
+  if (mode === "html") {
+    document.getElementById(targetId.replace("html-", "text-")).style.display = "none";
+    target.style.display = "";
+    siblings[0].className = "btn btn-primary btn-sm";
+    siblings[1].className = "btn btn-secondary btn-sm";
+  } else {
+    document.getElementById(targetId.replace("text-", "html-")).style.display = "none";
+    target.style.display = "";
+    siblings[0].className = "btn btn-secondary btn-sm";
+    siblings[1].className = "btn btn-primary btn-sm";
+  }
+}
+
+function autoHeight(iframe) {
+  try {
+    var h = iframe.contentDocument.body.scrollHeight;
+    iframe.style.height = Math.min(Math.max(h + 24, 100), 600) + "px";
+  } catch(e) {}
+}
+</script>
+{% endblock %}

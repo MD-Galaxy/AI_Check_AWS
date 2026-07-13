@@ -1,0 +1,10 @@
+<form method="post" action="{{ base_path }}/register/assign-email">
+  <div class="form-group">
+    <label for="alternate_email">Alternate email <span class="label-hint">(used only to generate a different sending address)</span></label>
+    <input type="email" id="alternate_email" name="alternate_email" required
+           placeholder="another.email@example.com">
+  </div>
+  <div style="margin-top: 16px;">
+    <button type="submit" class="btn btn-primary btn-block">Generate &amp; finish</button>
+  </div>
+</form>

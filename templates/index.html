@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+{% block title %}Send RFQ — EmailPOC{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title">Send RFQ Email</div>
+  <div class="page-sub">Create a new request-for-quotation with a unique tracked email address</div>
+</div>
+
+{% if success %}
+<div class="alert alert-success">
+  ✅ Email sent successfully! Conversation ID: <strong>{{ conv_id }}</strong>
+  — <a href="{{ base_path }}/tracking/{{ conv_id }}">View conversation →</a>
+</div>
+{% endif %}
+
+{% if error %}
+<div class="alert alert-error">
+  ❌ Failed to send email: {{ error }}
+</div>
+{% endif %}
+
+<div class="compose-layout">
+
+  <div>
+    <form method="post" action="{{ base_path }}/send" id="rfq-form" enctype="multipart/form-data">
+
+      <input type="hidden" id="project_id" name="project_id">
+      <input type="hidden" id="project_name_hidden" name="project_name">
+
+      <div class="compose-card">
+        <div class="compose-card-header">
+          <div class="compose-card-icon">🏭</div>
+          <div class="compose-card-title">Supplier Details</div>
+        </div>
+        <div class="compose-card-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="supplier_name">Supplier Name</label>
+              <input type="text" id="supplier_name" name="supplier_name" required
+                     placeholder="e.g. Acme Electronics" oninput="updatePreview()">
+            </div>
+            <div class="form-group">
+              <label for="supplier_email">Supplier Email</label>
+              <input type="email" id="supplier_email" name="supplier_email" required
+                     placeholder="e.g. purchasing@acme.com" oninput="updatePreview()">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="compose-card">
+        <div class="compose-card-header">
+          <div class="compose-card-icon">📦</div>
+          <div class="compose-card-title">Product Details</div>
+        </div>
+        <div class="compose-card-body">
+          <div class="form-grid">
+            <div class="form-group span2">
+              <label for="project_select">Catalog product <span class="label-hint">(optional — auto-fills the name below)</span></label>
+              <select id="project_select" onchange="updateProjectFields(this)">
+                <option value="">— Select a product (optional) —</option>
+                {% for project in predefined_projects %}
+                <option value="{{ project.id }}" data-product="{{ project.product_name }}">
+                  {{ project.product_name }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group span2">
+              <label for="product_name">Product Name <span class="label-hint">(editable)</span></label>
+              <input type="text" id="product_name" name="product_name" required
+                     placeholder="e.g. Bluetooth Speaker Model X200" oninput="updatePreview()">
+            </div>
+            <div class="form-group">
+              <label for="quantity">Quantity <span class="label-hint">(units)</span></label>
+              <input type="number" id="quantity" name="quantity" required
+                     min="1" placeholder="e.g. 500" oninput="updatePreview()">
+            </div>
+            <div class="form-group">
+              <label for="target_price">Target Price <span class="label-hint">(per unit)</span></label>
+              <input type="text" id="target_price" name="target_price" required
+                     placeholder="e.g. $12.00" oninput="updatePreview()">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="compose-card">
+        <div class="compose-card-header">
+          <div class="compose-card-icon">📎</div>
+          <div class="compose-card-title">Attachments <span class="label-hint">(optional)</span></div>
+        </div>
+        <div class="compose-card-body">
+          <div class="dropzone" id="dropzone">
+            <div class="dropzone-icon">📤</div>
+            <div class="dropzone-text">Click to browse, or drag files here</div>
+            <div class="dropzone-hint">PDF, images, Word docs, spreadsheets, etc.</div>
+          </div>
+          <input type="file" id="attachments" name="attachments" multiple style="display:none;">
+          <div class="file-chip-list" id="file-chip-list"></div>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <aside class="preview-panel">
+    <div class="preview-card">
+      <div class="preview-card-header">Live Preview</div>
+      <div class="preview-body">
+        <div class="preview-row">
+          <div class="preview-label">From</div>
+          <div class="preview-value mono">
+            {{ current_user.sending_email or "no permanent address assigned yet" }}
+          </div>
+        </div>
+        <div class="preview-row">
+          <div class="preview-label">To</div>
+          <div class="preview-value" id="prev-to">
+            <span class="preview-value muted">Enter supplier details</span>
+          </div>
+        </div>
+        <div class="preview-row">
+          <div class="preview-label">Subject</div>
+          <div class="preview-subject" id="prev-subject">[RFQ-••••] Request for Quotation</div>
+        </div>
+
+        <div class="preview-divider"></div>
+
+        <div class="preview-row">
+          <div class="preview-label">Quantity &amp; Target Price</div>
+          <div class="preview-value" id="prev-qty">—</div>
+        </div>
+        <div class="preview-row">
+          <div class="preview-label">Attachments</div>
+          <div class="preview-value" id="prev-attachments">
+            <span class="preview-attachment-count">📎 0 files</span>
+          </div>
+        </div>
+        <div class="preview-row">
+          <div class="preview-label">Reply address</div>
+          <div class="preview-value mono" style="font-size:11px; color:var(--txt2);">
+            {{ current_user.full_name.split() | map('capitalize') | join('') }}-{thread_id}@{{ inbound_domain or "your-domain" }}
+          </div>
+        </div>
+      </div>
+      <div class="preview-footer">
+        <button type="submit" form="rfq-form" class="btn btn-primary btn-block" id="submit-btn">
+          <span>📤</span> Send RFQ Email
+        </button>
+        <div class="text-sm text-muted" id="sending-msg" style="display:none; text-align:center; margin-top:8px;">
+          Sending…
+        </div>
+      </div>
+    </div>
+  </aside>
+
+</div>
+
+<div style="margin-top: 24px; padding: 16px 20px; background: var(--card); border: 1px solid var(--border); border-radius: var(--r);">
+  <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--txt2);">How it works</div>
+  <ol style="padding-left: 18px; font-size: 13px; color: var(--txt2); line-height: 1.8;">
+    <li>A unique email address is generated per conversation (encodes your name + a thread ID).</li>
+    <li>The RFQ is sent from that address — supplier replies come back to the same address.</li>
+    <li>Your active provider routes inbound replies to <code style="background:var(--bg);padding:1px 5px;border-radius:3px;">/webhooks/inbound</code>, which parses and stores the reply.</li>
+    <li>View the full conversation thread on the <a href="{{ base_path }}/tracking">Tracking</a> page.</li>
+  </ol>
+</div>
+
+<script>
+  var fileInput = document.getElementById("attachments");
+  var dropzone = document.getElementById("dropzone");
+
+  function updateProjectFields(select) {
+    var opt = select.options[select.selectedIndex];
+    document.getElementById("project_id").value = opt.value;
+    document.getElementById("project_name_hidden").value = opt.dataset.product || "";
+    if (opt.value &&
+        (!document.getElementById("product_name").value ||
+         document.getElementById("product_name").dataset.autoFilled === "1")) {
+      document.getElementById("product_name").value = opt.dataset.product || "";
+      document.getElementById("product_name").dataset.autoFilled = "1";
+    }
+    updatePreview();
+  }
+
+  document.getElementById("product_name").addEventListener("input", function() {
+    this.dataset.autoFilled = "0";
+  });
+
+  function formatBytes(bytes) {
+    if (bytes < 1024) return bytes + "B";
+    if (bytes < 1048576) return Math.round(bytes / 1024) + "KB";
+    return (bytes / 1048576).toFixed(1) + "MB";
+  }
+
+  function renderFileChips() {
+    var list = document.getElementById("file-chip-list");
+    list.innerHTML = "";
+    Array.prototype.forEach.call(fileInput.files, function (file, index) {
+      var chip = document.createElement("div");
+      chip.className = "file-chip";
+      chip.innerHTML =
+        '<span class="file-chip-name">' + file.name + '</span>' +
+        '<span class="file-chip-size">' + formatBytes(file.size) + '</span>' +
+        '<button type="button" class="file-chip-remove" aria-label="Remove">✕</button>';
+      chip.querySelector(".file-chip-remove").addEventListener("click", function () {
+        removeFile(index);
+      });
+      list.appendChild(chip);
+    });
+    updatePreview();
+  }
+
+  function removeFile(index) {
+    var dt = new DataTransfer();
+    Array.prototype.forEach.call(fileInput.files, function (file, i) {
+      if (i !== index) dt.items.add(file);
+    });
+    fileInput.files = dt.files;
+    renderFileChips();
+  }
+
+  function addFiles(newFiles) {
+    var dt = new DataTransfer();
+    Array.prototype.forEach.call(fileInput.files, function (file) { dt.items.add(file); });
+    Array.prototype.forEach.call(newFiles, function (file) { dt.items.add(file); });
+    fileInput.files = dt.files;
+    renderFileChips();
+  }
+
+  dropzone.addEventListener("click", function () { fileInput.click(); });
+  fileInput.addEventListener("change", function () { renderFileChips(); });
+
+  ["dragenter", "dragover"].forEach(function (evt) {
+    dropzone.addEventListener(evt, function (e) {
+      e.preventDefault();
+      dropzone.classList.add("dragover");
+    });
+  });
+  ["dragleave", "drop"].forEach(function (evt) {
+    dropzone.addEventListener(evt, function (e) {
+      e.preventDefault();
+      dropzone.classList.remove("dragover");
+    });
+  });
+  dropzone.addEventListener("drop", function (e) {
+    if (e.dataTransfer && e.dataTransfer.files.length) {
+      addFiles(e.dataTransfer.files);
+    }
+  });
+
+  function updatePreview() {
+    var supplierName = document.getElementById("supplier_name").value.trim();
+    var supplierEmail = document.getElementById("supplier_email").value.trim();
+    var productName = document.getElementById("product_name").value.trim();
+    var quantity = document.getElementById("quantity").value.trim();
+    var targetPrice = document.getElementById("target_price").value.trim();
+
+    var toEl = document.getElementById("prev-to");
+    if (supplierEmail) {
+      toEl.innerHTML = (supplierName ? supplierName + " " : "") +
+        '<span class="mono" style="color:var(--txt2);">&lt;' + supplierEmail + '&gt;</span>';
+    } else {
+      toEl.innerHTML = '<span class="preview-value muted">Enter supplier details</span>';
+    }
+
+    var subjectEl = document.getElementById("prev-subject");
+    subjectEl.textContent = "[RFQ-••••] Request for Quotation" + (productName ? " — " + productName : "");
+
+    var qtyEl = document.getElementById("prev-qty");
+    if (quantity || targetPrice) {
+      qtyEl.textContent = (quantity || "—") + " units" + (targetPrice ? " @ " + targetPrice : "");
+    } else {
+      qtyEl.textContent = "—";
+    }
+
+    var attEl = document.getElementById("prev-attachments");
+    var count = fileInput.files.length;
+    attEl.innerHTML = '<span class="preview-attachment-count">📎 ' + count +
+      (count === 1 ? " file" : " files") + '</span>';
+  }
+
+  document.getElementById("rfq-form").addEventListener("submit", function (e) {
+    if (!document.getElementById("supplier_email").value) {
+      return;
+    }
+    document.getElementById("submit-btn").disabled = true;
+    document.getElementById("submit-btn").textContent = "Sending…";
+    document.getElementById("sending-msg").style.display = "block";
+  });
+
+  updatePreview();
+</script>
+{% endblock %}

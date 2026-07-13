@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Email Tracking — EmailPOC{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title">Email Tracking</div>
+  <div class="page-sub">Your RFQ conversations and their replies</div>
+</div>
+
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-value">{{ stats.total }}</div>
+    <div class="stat-label">Conversations</div>
+  </div>
+  <div class="stat-card amber">
+    <div class="stat-value">{{ stats.open }}</div>
+    <div class="stat-label">Awaiting Reply</div>
+  </div>
+  <div class="stat-card green">
+    <div class="stat-value">{{ stats.replied }}</div>
+    <div class="stat-label">Replied</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" style="color: var(--danger);">{{ stats.declined }}</div>
+    <div class="stat-label">Declined</div>
+  </div>
+</div>
+
+{% if deleted %}
+<div class="alert alert-success">🗑️ Conversation deleted.</div>
+{% endif %}
+
+{% if conversations %}
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Conv ID</th>
+          <th>Product</th>
+          <th>Supplier</th>
+          <th>Qty</th>
+          <th>Target Price</th>
+          <th>Status</th>
+          <th>Replies</th>
+          <th>Created</th>
+          <th>Last Reply</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for conv in conversations %}
+        <tr onclick="location.href='{{ base_path }}/tracking/{{ conv.conv_id }}'">
+          <td class="mono" style="font-size:12px;">{{ conv.conv_id }}</td>
+          <td>
+            {% if conv.project_name %}
+              <div style="font-weight:600; font-size:13px;">{{ conv.project_name }}</div>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td>
+            <div style="font-weight:600;">{{ conv.supplier_name or '—' }}</div>
+            <div class="text-xs text-muted">{{ conv.supplier_email }}</div>
+          </td>
+          <td>{{ conv.quantity or '—' }}</td>
+          <td>{{ conv.target_price or '—' }}</td>
+          <td>
+            {% if conv.status == 'replied' %}
+              <span class="badge badge-replied">Replied</span>
+            {% elif conv.status == 'declined' %}
+              <span class="badge badge-declined">Declined</span>
+            {% else %}
+              <span class="badge badge-open">Open</span>
+            {% endif %}
+          </td>
+          <td style="text-align:center;">
+            {% if conv.reply_count %}
+              <span style="font-weight:600; color:var(--success);">{{ conv.reply_count }}</span>
+            {% else %}
+              <span class="text-muted">0</span>
+            {% endif %}
+          </td>
+          <td class="text-xs text-muted" style="white-space:nowrap;">
+            {{ conv.created_at[:16].replace('T',' ') if conv.created_at else '—' }}
+          </td>
+          <td class="text-xs text-muted" style="white-space:nowrap;">
+            {{ conv.last_reply_at[:16].replace('T',' ') if conv.last_reply_at else '—' }}
+          </td>
+          <td onclick="event.stopPropagation();">
+            <form method="post" action="{{ base_path }}/tracking/{{ conv.conv_id }}/delete"
+                  onsubmit="return confirm('Delete this conversation and all its messages? This cannot be undone.');">
+              <button type="submit" class="btn btn-danger btn-sm" title="Delete conversation">🗑️</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body">
+    <div class="empty-state">
+      <div class="empty-icon">📭</div>
+      <div class="empty-title">No conversations yet</div>
+      <div class="empty-sub">Send your first RFQ email to get started.</div>
+      <a href="{{ base_path }}/send" class="btn btn-primary">📤 Send RFQ Email</a>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

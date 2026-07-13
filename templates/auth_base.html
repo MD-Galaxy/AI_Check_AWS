@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}EmailPOC{% endblock %}</title>
+  <style>
+    :root {
+      --primary:       #2563EB;
+      --primary-dark:  #1D4ED8;
+      --primary-light: #EFF6FF;
+      --bg:            #F1F5F9;
+      --card:          #FFFFFF;
+      --border:        #E2E8F0;
+      --txt:           #1E293B;
+      --txt2:          #64748B;
+      --txt3:          #94A3B8;
+      --success:       #10B981;
+      --success-bg:    #D1FAE5;
+      --success-txt:   #065F46;
+      --warning-bg:    #FEF3C7;
+      --warning-txt:   #92400E;
+      --danger:        #EF4444;
+      --danger-bg:     #FEE2E2;
+      --danger-txt:    #991B1B;
+      --sidebar:       #1E293B;
+      --r:             8px;
+      --sh:            0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+      --sh-md:         0 4px 6px rgba(0,0,0,.05), 0 2px 4px rgba(0,0,0,.04);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--txt);
+      background: var(--bg);
+    }
+
+    a { color: var(--primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Form (shared with base.html) ────────── */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .form-grid.full { grid-template-columns: 1fr; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group.span2 { grid-column: 1 / -1; }
+    label { font-size: 13px; font-weight: 600; color: var(--txt); }
+    .label-hint { font-size: 12px; color: var(--txt2); font-weight: 400; margin-left: 4px; }
+
+    input[type=text], input[type=email], input[type=password], select {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 14px;
+      color: var(--txt);
+      background: #fff;
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    input:focus, select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+    }
+    input::placeholder { color: var(--txt3); }
+    .input-hint { font-size: 12px; color: var(--txt2); }
+
+    /* ── Buttons (shared with base.html) ─────── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+      padding: 9px 18px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      font-size: 14px; font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background .15s, border-color .15s, box-shadow .15s;
+      white-space: nowrap;
+    }
+    .btn:hover { text-decoration: none; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-dark); color: #fff; }
+    .btn-secondary { background: var(--card); color: var(--txt); border-color: var(--border); }
+    .btn-secondary:hover { background: var(--bg); }
+    .btn-block { width: 100%; }
+
+    /* ── Alerts (shared with base.html) ──────── */
+    .alert {
+      padding: 12px 16px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      border: 1px solid transparent;
+    }
+    .alert-success { background: var(--success-bg); color: var(--success-txt); border-color: #A7F3D0; }
+    .alert-error   { background: var(--danger-bg);  color: var(--danger-txt);  border-color: #FECACA; }
+    .text-sm { font-size: 13px; }
+    .text-muted { color: var(--txt2); }
+    .divider { height: 1px; background: var(--border); margin: 20px 0; }
+
+    /* ── Auth shell ───────────────────────────── */
+    .auth-shell {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .auth-wrap { width: 100%; max-width: 420px; }
+    .auth-logo {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      margin-bottom: 24px;
+    }
+    .auth-logo-icon {
+      width: 36px; height: 36px;
+      background: var(--primary);
+      border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 18px; flex-shrink: 0;
+    }
+    .auth-logo-text { color: var(--txt); font-weight: 700; font-size: 18px; }
+    .auth-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      box-shadow: var(--sh-md);
+      padding: 28px 28px 24px;
+    }
+    .auth-title { font-size: 19px; font-weight: 700; margin-bottom: 4px; }
+    .auth-sub { font-size: 13px; color: var(--txt2); margin-bottom: 20px; }
+    .auth-footer { text-align: center; margin-top: 18px; font-size: 13px; color: var(--txt2); }
+
+    /* ── Step indicator (registration wizard) ── */
+    .step-indicator {
+      display: flex; align-items: center; justify-content: center;
+      gap: 8px;
+      margin-bottom: 22px;
+    }
+    .step-dot {
+      display: flex; align-items: center; justify-content: center;
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      background: var(--bg);
+      color: var(--txt2);
+      font-size: 12px; font-weight: 700;
+      border: 1px solid var(--border);
+    }
+    .step-dot.done { background: var(--success); color: #fff; border-color: var(--success); }
+    .step-dot.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .step-line { width: 28px; height: 2px; background: var(--border); }
+    .step-line.done { background: var(--success); }
+  </style>
+</head>
+<body>
+<div class="auth-shell">
+  <div class="auth-wrap">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">✉</div>
+      <div class="auth-logo-text">EmailPOC</div>
+    </div>
+    <div class="auth-card">
+      {% block content %}{% endblock %}
+    </div>
+    {% block footer %}{% endblock %}
+  </div>
+</div>
+</body>
+</html>

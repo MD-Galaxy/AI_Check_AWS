@@ -1,0 +1,37 @@
+{% extends "auth_base.html" %}
+{% block title %}Log in — EmailPOC{% endblock %}
+
+{% block content %}
+<div class="auth-title">Welcome back</div>
+<div class="auth-sub">Log in to send and track RFQ emails.</div>
+
+{% if registered %}
+<div class="alert alert-success">✅ Registration complete — you can log in now.</div>
+{% endif %}
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+
+<form method="post" action="{{ base_path }}/login">
+  <div class="form-grid full">
+    <div class="form-group">
+      <label for="personal_email">Email</label>
+      <input type="email" id="personal_email" name="personal_email" required autofocus
+             value="{{ personal_email or '' }}" placeholder="you@example.com">
+    </div>
+    <div class="form-group">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" required placeholder="••••••••">
+    </div>
+  </div>
+  <div style="margin-top: 20px;">
+    <button type="submit" class="btn btn-primary btn-block">Log in</button>
+  </div>
+</form>
+{% endblock %}
+
+{% block footer %}
+<div class="auth-footer">
+  Don't have an account? <a href="{{ base_path }}/register">Register</a>
+</div>
+{% endblock %}
