@@ -49,6 +49,13 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 # changing this one constant.
 BASE_PATH = "/email_poc"
 
+# Base path the bedrock_availability_poc service serves its check under.
+# Must match BASE_PATH in bedrock_availability_poc/app.py — used only to
+# build the "/" landing page's "Check Bedrock" link (see
+# Settings.bedrock_service_url below), since that service is a separate
+# app/container this one never imports.
+BEDROCK_BASE_PATH = "/check-bedrock"
+
 
 class Settings:
     """Immutable snapshot of all application configuration.
@@ -178,6 +185,22 @@ class Settings:
         self.engagelab_api_base = os.getenv(
             "ENGAGELAB_API_BASE", "https://email.api.engagelab.cc"
         ).rstrip("/")
+
+        # ── Bedrock Availability POC (linked from the "/" landing page) ──
+        # Host-side port the bedrock_availability_poc container publishes
+        # (must match BEDROCK_PORT in docker-compose.yml / .env). Used to
+        # build the "Check Bedrock" link when BEDROCK_SERVICE_URL (below)
+        # isn't set explicitly.
+        self.bedrock_port = int(os.getenv("BEDROCK_PORT", "8080"))
+
+        # Full override for the "Check Bedrock" button's target URL. Leave
+        # unset (the default) to auto-derive it from the incoming request's
+        # own host + bedrock_port — that works unmodified for both local dev
+        # and a production host reachable on that port. Set this explicitly
+        # only when a reverse proxy fronts the bedrock service on a
+        # different host/path (e.g. path-based routing with no separate
+        # port), since then it can't be inferred from the request alone.
+        self.bedrock_service_url = os.getenv("BEDROCK_SERVICE_URL") or None
 
         # ── Filesystem paths (anchored at the repository root) ───────
         self.base_dir = BASE_DIR

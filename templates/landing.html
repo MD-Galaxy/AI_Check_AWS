@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Check AWS — Project Console</title>
+  <style>
+    :root {
+      --primary:       #2563EB;
+      --primary-dark:  #1D4ED8;
+      --primary-light: #EFF6FF;
+      --bg:            #F1F5F9;
+      --card:          #FFFFFF;
+      --border:        #E2E8F0;
+      --txt:           #1E293B;
+      --txt2:          #64748B;
+      --txt3:          #94A3B8;
+      --success:       #10B981;
+      --success-bg:    #D1FAE5;
+      --success-txt:   #065F46;
+      --warning-bg:    #FEF3C7;
+      --warning-txt:   #92400E;
+      --r:             10px;
+      --sh:            0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+      --sh-md:         0 4px 6px rgba(0,0,0,.05), 0 2px 4px rgba(0,0,0,.04);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--txt);
+      background: var(--bg);
+    }
+
+    .page { max-width: 900px; margin: 0 auto; padding: 48px 24px 64px; }
+
+    .hero { text-align: center; margin-bottom: 36px; }
+    .hero-title { font-size: 28px; font-weight: 700; color: var(--txt); }
+    .hero-sub { font-size: 14px; color: var(--txt2); margin-top: 8px; }
+
+    .section-list { display: flex; flex-direction: column; gap: 20px; }
+
+    .section-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      box-shadow: var(--sh);
+      overflow: hidden;
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .section-num {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: #fff;
+      font-weight: 700;
+      font-size: 13px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .section-title { font-size: 16px; font-weight: 700; color: var(--txt); }
+    .section-body { padding: 22px 24px; }
+    .section-desc { color: var(--txt2); font-size: 13.5px; margin-bottom: 16px; }
+
+    .note {
+      display: inline-block;
+      background: var(--primary-light);
+      color: var(--primary-dark);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 12.5px;
+      margin-bottom: 16px;
+    }
+    .note.warning { background: var(--warning-bg); color: var(--warning-txt); }
+
+    .btn-row { display: flex; flex-wrap: wrap; gap: 10px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 10px 18px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      font-size: 13.5px; font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background .15s, border-color .15s;
+      white-space: nowrap;
+    }
+    .btn:hover { text-decoration: none; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-secondary { background: #fff; color: var(--txt); border-color: var(--border); }
+    .btn-secondary:hover { background: var(--bg); }
+
+    .footer-note { text-align: center; color: var(--txt3); font-size: 12px; margin-top: 32px; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <div class="hero">
+    <div class="hero-title">AI Check AWS</div>
+    <div class="hero-sub">Two proofs of concept in one place — AWS Bedrock model availability, and RFQ email automation.</div>
+  </div>
+
+  <div class="section-list">
+
+    <!-- 1. Check Bedrock -->
+    <div class="section-card">
+      <div class="section-header">
+        <div class="section-num">1</div>
+        <div class="section-title">Check Bedrock Availability</div>
+      </div>
+      <div class="section-body">
+        <div class="section-desc">
+          Checks which AI model providers (Claude, DeepSeek, Qwen, ChatGPT, Zhipu GLM) your
+          AWS account can actually access on Amazon Bedrock in the configured region — and
+          proves it by invoking each one for real, not just listing it. Also runs an
+          independent direct-to-Anthropic-API check. Opens the Bedrock service's own page
+          with the live JSON result.
+        </div>
+        <div class="btn-row">
+          <a class="btn btn-primary" target="_blank" href="{{ bedrock_url }}">Run Bedrock Check</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Default user bypass -->
+    <div class="section-card">
+      <div class="section-header">
+        <div class="section-num">2</div>
+        <div class="section-title">Default User — "John Carter" (Bypass Login)</div>
+      </div>
+      <div class="section-body">
+        <div class="section-desc">
+          A shortcut for quickly exploring EmailPOC without registering: it skips the whole
+          login/registration wizard, logs you in as a fixed demo user named
+          <strong>John Carter</strong>, and drops you straight on the Send RFQ page.
+        </div>
+        {% if dev_bypass_enabled %}
+        <div class="note">Enabled — DEV_BYPASS_LOGIN=true</div>
+        {% else %}
+        <div class="note warning">Disabled — set DEV_BYPASS_LOGIN=true in .env to use this button (it 404s otherwise).</div>
+        {% endif %}
+        <div class="btn-row">
+          <a class="btn btn-primary" target="_blank" href="{{ base_path }}/dev/login-john-carter">Continue as John Carter</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Normal email POC flow -->
+    <div class="section-card">
+      <div class="section-header">
+        <div class="section-num">3</div>
+        <div class="section-title">EmailPOC — Normal Flow</div>
+      </div>
+      <div class="section-body">
+        <div class="section-desc">
+          The real user journey: create an account through the 3-step registration wizard
+          (or log in if you already have one), then send RFQ emails to suppliers from a
+          per-conversation dynamic address and track replies from your personal dashboard.
+        </div>
+        <div class="btn-row">
+          <a class="btn btn-primary" target="_blank" rel="noopener" href="{{ base_path }}/register">Register</a>
+          <a class="btn btn-secondary" target="_blank" rel="noopener" href="{{ base_path }}/login">Login</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer-note">AI Check AWS — Bedrock Availability POC + EmailPOC</div>
+</div>
+</body>
+</html>

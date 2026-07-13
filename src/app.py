@@ -23,13 +23,13 @@ Example:
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from src.auth.dev_bypass import router as dev_bypass_router
 from src.auth.routes import router as auth_router
-from src.config import BASE_PATH, get_settings
+from src.config import BASE_PATH, BEDROCK_BASE_PATH, get_settings
 from src.db.repository import Repository
 from src.db.session import create_engine_and_sessionmaker
 from src.email_platform.factory import EmailProviderFactory
@@ -121,6 +121,27 @@ def create_app() -> FastAPI:
     app.include_router(auth_router, prefix=BASE_PATH)
     app.include_router(dev_bypass_router, prefix=BASE_PATH)
     app.include_router(router, prefix=BASE_PATH)
+
+    # 6. Bare "/" landing page — links out to both POCs (this app's own
+    # /email_poc routes, and the separately-running bedrock_availability_poc
+    # container), so it's registered on the app directly rather than under
+    # BASE_PATH.
+    @app.get("/")
+    async def landing(request: Request):
+        # Prefer an explicit override (e.g. a reverse proxy fronting the
+        # bedrock service on a different host/path); otherwise derive the
+        # link from this very request's own host, so it's correct unmodified
+        # on localhost, a LAN IP, or a production domain alike.
+        bedrock_url = settings.bedrock_service_url or (
+            f"{request.url.scheme}://{request.url.hostname}:"
+            f"{settings.bedrock_port}{BEDROCK_BASE_PATH}/"
+        )
+        return app.state.templates.TemplateResponse(request, "landing.html", {
+            "base_path": BASE_PATH,
+            "bedrock_url": bedrock_url,
+            "dev_bypass_enabled": settings.dev_bypass_login,
+        })
+
     logger.info("EmailPOC application ready")
     return app
 

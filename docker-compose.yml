@@ -37,5 +37,19 @@ services:
       db:
         condition: service_healthy
 
+  # Bedrock Availability POC — a separate FastAPI service (its own
+  # container/image), served under /check-bedrock. Linked from the "Check
+  # Bedrock" button on the landing page ("/") served by the "app" service
+  # above; see bedrock_availability_poc/README.md for details.
+  bedrock:
+    build:
+      context: ./bedrock_availability_poc
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${BEDROCK_PORT:-8080}:8080"
+
 volumes:
   postgres_data:

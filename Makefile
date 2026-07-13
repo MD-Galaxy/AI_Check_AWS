@@ -2,23 +2,30 @@
 .PHONY: up down restart build logs ps migrate reset-db clean john-carter
 
 # One command to run the whole project: builds the images, starts Postgres
-# + the app, and the app's entrypoint applies database migrations
-# automatically (safe to run every time — see docker/entrypoint.sh).
+# + EmailPOC + the Bedrock Availability POC, and EmailPOC's entrypoint
+# applies database migrations automatically (safe to run every time — see
+# docker/entrypoint.sh).
 up:
 	@if [ ! -f .env ]; then \
 		cp .env.docker.example .env; \
 		echo ""; \
 		echo "==> Created .env from .env.docker.example."; \
 		echo "==> Open .env and fill in: SECRET_KEY, INBOUND_DOMAIN, FROM_EMAIL,"; \
-		echo "==> ENGAGELAB_API_USER, ENGAGELAB_API_KEY — then run 'make up' again."; \
+		echo "==> ENGAGELAB_API_USER, ENGAGELAB_API_KEY (or the SENDCLOUD_* pair"; \
+		echo "==> instead), and AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY (or"; \
+		echo "==> AWS_PROFILE) for the Bedrock check — then run 'make up' again."; \
 		echo ""; \
 		exit 1; \
 	fi
 	docker compose up -d --build
-	@echo ""
-	@echo "EmailPOC is starting. Give it a few seconds, then open:"
-	@echo "  http://localhost:$$(grep -m1 '^APP_PORT=' .env | cut -d= -f2)"
-	@echo "Follow logs with: make logs"
+	@PORT=$$(grep -m1 '^APP_PORT=' .env | cut -d= -f2); PORT=$${PORT:-7000}; \
+	BPORT=$$(grep -m1 '^BEDROCK_PORT=' .env | cut -d= -f2); BPORT=$${BPORT:-8080}; \
+	echo ""; \
+	echo "Starting up. Give it a few seconds, then open:"; \
+	echo "  http://localhost:$$PORT/            (landing page — links to both POCs)"; \
+	echo "  http://localhost:$$PORT/email_poc/   (EmailPOC)"; \
+	echo "  http://localhost:$$BPORT/check-bedrock/  (Bedrock Availability check)"; \
+	echo "Follow logs with: make logs"
 
 down:
 	docker compose down
