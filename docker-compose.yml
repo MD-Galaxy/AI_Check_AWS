@@ -16,12 +16,14 @@ services:
       timeout: 5s
       retries: 10
 
-  # The web app. On every start, its entrypoint (docker/entrypoint.sh) runs
-  # `alembic upgrade head` against the "db" service above before launching
-  # Uvicorn — the database schema is created/updated automatically, and
-  # re-running it (container restart, `docker compose up` again, etc.) never
-  # raises a duplicate-object error because Alembic tracks what has already
-  # been applied.
+  # The web app — EmailPOC AND the Bedrock Availability POC in one process
+  # (src/app.py mounts bedrock_availability_poc/'s routes into this same
+  # FastAPI app), served on one port. On every start, its entrypoint
+  # (docker/entrypoint.sh) runs `alembic upgrade head` against the "db"
+  # service above before launching Uvicorn — the database schema is
+  # created/updated automatically, and re-running it (container restart,
+  # `docker compose up` again, etc.) never raises a duplicate-object error
+  # because Alembic tracks what has already been applied.
   app:
     build:
       context: .
@@ -30,26 +32,12 @@ services:
     env_file:
       - .env
     ports:
-      - "${APP_PORT:-7000}:7000"
+      - "${APP_PORT:-8000}:8000"
     volumes:
       - ./data:/app/data
     depends_on:
       db:
         condition: service_healthy
-
-  # Bedrock Availability POC — a separate FastAPI service (its own
-  # container/image), served under /check-bedrock. Linked from the "Check
-  # Bedrock" button on the landing page ("/") served by the "app" service
-  # above; see bedrock_availability_poc/README.md for details.
-  bedrock:
-    build:
-      context: ./bedrock_availability_poc
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    env_file:
-      - .env
-    ports:
-      - "${BEDROCK_PORT:-8080}:8080"
 
 volumes:
   postgres_data:

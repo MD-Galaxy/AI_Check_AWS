@@ -1,6 +1,8 @@
 # AI Check AWS
 
-Two proofs of concept, run together from this one repo:
+Two proofs of concept, served by **one process on one port** from this one
+repo (`src/app.py` mounts the Bedrock POC's routes into the same FastAPI app
+EmailPOC runs):
 
 - **EmailPOC** — RFQ (Request for Quotation) email conversations with
   suppliers using dynamic email addressing, backed by PostgreSQL. Served at
@@ -12,21 +14,22 @@ Two proofs of concept, run together from this one repo:
   GLM) your AWS account can actually access on Amazon Bedrock, by really
   invoking each one. Served at **`/check-bedrock`**. See
   [`bedrock_availability_poc/README.md`](bedrock_availability_poc/README.md)
-  for how the check itself works.
+  for how the check itself works (that doc also still covers running it
+  entirely standalone, on its own port, if you want that instead).
 
 Once running, open **`/`** — a landing page with three sections that link
 into both: running the Bedrock check, a "default user" login bypass, and
 the normal EmailPOC register/login/track flow.
 
 This README covers **installation only** — running the stack with Docker,
-or running each service manually.
+or running it manually.
 
 ---
 
 ## Option A: Docker (recommended — no Python setup required)
 
-Runs three containers with one command: Postgres, EmailPOC, and the
-Bedrock Availability POC.
+Runs two containers with one command: Postgres, and the app (EmailPOC +
+Bedrock Availability POC together, one image, one port).
 
 ### 1. Install Docker Desktop
 
@@ -44,8 +47,8 @@ need Python, `uv`, or Postgres installed on your machine.
   Optionally an `ANTHROPIC_API_KEY` for the extra direct-API check.
 
 You can skip this step to just click through the UI without sending mail or
-running a real Bedrock check — both services still start, they just can't
-do the real work until these are set.
+running a real Bedrock check — the app still starts, it just can't do the
+real work until these are set.
 
 ### 3. Run it
 
@@ -64,8 +67,8 @@ The first run creates `.env` from [`.env.docker.example`](.env.docker.example)
 and stops so you can fill in your credentials. Open `.env`, fill in
 `SECRET_KEY`, `INBOUND_DOMAIN`, `FROM_EMAIL`, the EngageLab or SendCloud
 pair, and the AWS/Anthropic variables — then run the same command again.
-This time it builds the images, starts Postgres, waits for it to be
-healthy, and starts both app containers. EmailPOC's container also applies
+This time it builds the image, starts Postgres, waits for it to be
+healthy, and starts the app container. Its entrypoint also applies
 database migrations automatically on every start (safe to re-run — see
 [`docker/entrypoint.sh`](docker/entrypoint.sh)).
 
@@ -73,9 +76,9 @@ Once it's up, open:
 
 | URL | What it is |
 | --- | --- |
-| `http://localhost:7000/` | Landing page — links to both POCs |
-| `http://localhost:7000/email_poc/` | EmailPOC |
-| `http://localhost:8080/check-bedrock/` | Bedrock Availability check (JSON) |
+| `http://localhost:8000/` | Landing page — links to both POCs |
+| `http://localhost:8000/email_poc/` | EmailPOC |
+| `http://localhost:8000/check-bedrock/` | Bedrock Availability check (JSON) |
 
 ### Everyday commands
 
@@ -97,16 +100,16 @@ the [`Makefile`](Makefile), each target is a one-liner.
 
 ## Option B: Manual (no Docker)
 
-Each service is run independently — use this if you're actively developing
-one of them and want hot-reload.
-
-### EmailPOC
+One process serves both POCs — start it once and both `/email_poc` and
+`/check-bedrock` are live.
 
 Prerequisites: Python ≥ 3.11, [uv](https://docs.astral.sh/uv/), PostgreSQL
-16 (or just `docker compose up -d db`).
+16 (or just `docker compose up -d db`), and an AWS account with Bedrock
+access for the Bedrock check.
 
 ```bash
-# 1. Install dependencies (uv creates .venv automatically)
+# 1. Install dependencies (uv creates .venv automatically; this also pulls
+#    in boto3/rich/anthropic for the Bedrock POC — see pyproject.toml)
 uv sync
 
 # 2. Start Postgres (or point DATABASE_URL at one you already have)
@@ -114,7 +117,7 @@ docker compose up -d db
 
 # 3. Configure environment
 cp .env.example .env
-nano .env            # set EMAIL_PROVIDER (engagelab/sendcloud) + its credentials
+nano .env            # EMAIL_PROVIDER + its credentials, and AWS_REGION + credentials
 
 # 4. Apply database migrations
 uv run alembic upgrade head
@@ -122,32 +125,16 @@ uv run alembic upgrade head
 # 5. Run the hot-reload development server
 uv run python main.py
 # or directly:
-uv run uvicorn src.app:app --host 0.0.0.0 --port 7000 --reload
+uv run uvicorn src.app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Open **http://localhost:7000/** (landing page) or
-**http://localhost:7000/email_poc/** directly.
-
-### Bedrock Availability POC
-
-Prerequisites: Python ≥ 3.9, an AWS account with Bedrock access.
-
-```bash
-cd bedrock_availability_poc
-pip install -r requirements.txt
-cp .env.example .env
-nano .env             # set AWS_REGION + credentials
-
-# CLI (one-off check, prints a table + writes a JSON report)
-python main.py
-
-# Or as a web service (FastAPI, hot-reload)
-uvicorn app:app --host 0.0.0.0 --port 8080 --reload
-```
-
-Open **http://localhost:8080/check-bedrock/**. See
+Open **http://localhost:8000/** (landing page), or go straight to
+**http://localhost:8000/email_poc/** or
+**http://localhost:8000/check-bedrock/**. See
 [`bedrock_availability_poc/README.md`](bedrock_availability_poc/README.md)
-for the full breakdown of what the check does and how to read its output.
+for the full breakdown of what the Bedrock check does and how to read its
+output (and how to run that POC entirely on its own, on its own port,
+instead of merged into this app).
 
 ---
 

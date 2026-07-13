@@ -15,6 +15,7 @@ if not exist .env (
 
 docker compose up -d --build
 echo.
-echo EmailPOC is starting. Give it a few seconds, then open http://localhost:7000
-echo (or the APP_PORT you set in .env) in your browser.
+echo EmailPOC + Bedrock Availability POC are starting. Give it a few seconds,
+echo then open http://localhost:8000 (or the APP_PORT you set in .env) in your
+echo browser.
 pause

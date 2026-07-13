@@ -4,6 +4,14 @@ A small proof-of-concept that checks which AI model providers your AWS
 account actually has access to on Amazon Bedrock — and proves it by sending
 each one a real request, not just checking a listing.
 
+> **Running this as part of the root project?** `src/app.py` mounts this
+> POC's FastAPI routes into EmailPOC's own app, so both are served by one
+> process on one port (`http://localhost:8000/check-bedrock/` by default —
+> see the root [`README.md`](../README.md)). Everything below describes
+> running this folder entirely on its own instead, on its own port — useful
+> if you're developing just this piece, or deploying it as a separate
+> service.
+
 ## What it does
 
 1. Lists every foundation model your AWS account/region can see

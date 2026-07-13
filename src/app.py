@@ -21,6 +21,7 @@ Example:
     'EmailPOC'
 """
 
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -29,7 +30,7 @@ from fastapi.templating import Jinja2Templates
 
 from src.auth.dev_bypass import router as dev_bypass_router
 from src.auth.routes import router as auth_router
-from src.config import BASE_PATH, BEDROCK_BASE_PATH, get_settings
+from src.config import BASE_DIR, BASE_PATH, BEDROCK_BASE_PATH, get_settings
 from src.db.repository import Repository
 from src.db.session import create_engine_and_sessionmaker
 from src.email_platform.factory import EmailProviderFactory
@@ -37,6 +38,21 @@ from src.logger import AppLogger
 from src.route import router
 from src.services.conversation_service import ConversationService
 from src.webhook_factory.factory import WebhookParserFactory
+
+# bedrock_availability_poc/ is a standalone project (its own README, CLI,
+# Dockerfile, standalone `uvicorn app:app`) that imports its own modules
+# by bare name (`import config`, `from main import run_check`, ...). Rather
+# than fork its code into a package, we put its directory on sys.path so
+# those same bare imports resolve correctly when pulled in from here too —
+# that keeps it independently runnable exactly as documented, while also
+# letting this app mount its routes and serve both POCs from one process
+# on one port. Must happen before the `from app import ...` below.
+_BEDROCK_DIR = BASE_DIR / "bedrock_availability_poc"
+if str(_BEDROCK_DIR) not in sys.path:
+    sys.path.insert(0, str(_BEDROCK_DIR))
+
+from app import health as bedrock_health  # noqa: E402
+from app import router as bedrock_router  # noqa: E402
 
 
 def create_app() -> FastAPI:
@@ -122,19 +138,23 @@ def create_app() -> FastAPI:
     app.include_router(dev_bypass_router, prefix=BASE_PATH)
     app.include_router(router, prefix=BASE_PATH)
 
-    # 6. Bare "/" landing page — links out to both POCs (this app's own
-    # /email_poc routes, and the separately-running bedrock_availability_poc
-    # container), so it's registered on the app directly rather than under
-    # BASE_PATH.
+    # 6. Bedrock Availability POC's own routes, mounted into this same app
+    # (see the sys.path wiring above) so both POCs are served by one
+    # process on one port instead of two separate containers/ports.
+    app.include_router(bedrock_router, prefix=BEDROCK_BASE_PATH)
+    app.add_api_route("/health", bedrock_health, methods=["GET"])
+
+    # 7. Bare "/" landing page — links out to both POCs, so it's registered
+    # on the app directly rather than under BASE_PATH.
     @app.get("/")
     async def landing(request: Request):
-        # Prefer an explicit override (e.g. a reverse proxy fronting the
-        # bedrock service on a different host/path); otherwise derive the
-        # link from this very request's own host, so it's correct unmodified
-        # on localhost, a LAN IP, or a production domain alike.
+        # Prefer an explicit override (e.g. a reverse proxy fronting this
+        # app under a different host/path); otherwise derive the link from
+        # this very request's own host, so it's correct unmodified on
+        # localhost, a LAN IP, or a production domain alike. Same host and
+        # port as this landing page itself now that both POCs share one app.
         bedrock_url = settings.bedrock_service_url or (
-            f"{request.url.scheme}://{request.url.hostname}:"
-            f"{settings.bedrock_port}{BEDROCK_BASE_PATH}/"
+            f"{request.url.scheme}://{request.url.netloc}{BEDROCK_BASE_PATH}/"
         )
         return app.state.templates.TemplateResponse(request, "landing.html", {
             "base_path": BASE_PATH,

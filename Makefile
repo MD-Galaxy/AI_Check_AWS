@@ -1,10 +1,10 @@
 .DEFAULT_GOAL := up
 .PHONY: up down restart build logs ps migrate reset-db clean john-carter
 
-# One command to run the whole project: builds the images, starts Postgres
-# + EmailPOC + the Bedrock Availability POC, and EmailPOC's entrypoint
-# applies database migrations automatically (safe to run every time — see
-# docker/entrypoint.sh).
+# One command to run the whole project: builds the image, starts Postgres +
+# the app (EmailPOC and the Bedrock Availability POC in one process, one
+# port), and the app's entrypoint applies database migrations automatically
+# (safe to run every time — see docker/entrypoint.sh).
 up:
 	@if [ ! -f .env ]; then \
 		cp .env.docker.example .env; \
@@ -18,13 +18,12 @@ up:
 		exit 1; \
 	fi
 	docker compose up -d --build
-	@PORT=$$(grep -m1 '^APP_PORT=' .env | cut -d= -f2); PORT=$${PORT:-7000}; \
-	BPORT=$$(grep -m1 '^BEDROCK_PORT=' .env | cut -d= -f2); BPORT=$${BPORT:-8080}; \
+	@PORT=$$(grep -m1 '^APP_PORT=' .env | cut -d= -f2); PORT=$${PORT:-8000}; \
 	echo ""; \
 	echo "Starting up. Give it a few seconds, then open:"; \
-	echo "  http://localhost:$$PORT/            (landing page — links to both POCs)"; \
-	echo "  http://localhost:$$PORT/email_poc/   (EmailPOC)"; \
-	echo "  http://localhost:$$BPORT/check-bedrock/  (Bedrock Availability check)"; \
+	echo "  http://localhost:$$PORT/                   (landing page — links to both POCs)"; \
+	echo "  http://localhost:$$PORT/email_poc/          (EmailPOC)"; \
+	echo "  http://localhost:$$PORT/check-bedrock/      (Bedrock Availability check)"; \
 	echo "Follow logs with: make logs"
 
 down:
@@ -66,7 +65,7 @@ john-carter:
 		exit 1; \
 	fi
 	@PORT=$$(grep -m1 '^APP_PORT=' .env | cut -d= -f2); \
-	PORT=$${PORT:-7000}; \
+	PORT=$${PORT:-8000}; \
 	echo "Waiting for EmailPOC to be ready on port $$PORT..."; \
 	for i in $$(seq 1 30); do \
 		curl -sf -o /dev/null "http://localhost:$$PORT/email_poc/login" && break; \
