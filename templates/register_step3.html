@@ -1,0 +1,43 @@
+{% extends "auth_base.html" %}
+{% block title %}Your sending address — EmailPOC{% endblock %}
+
+{% block content %}
+<div class="step-indicator">
+  <div class="step-dot done">✓</div>
+  <div class="step-line done"></div>
+  <div class="step-dot done">✓</div>
+  <div class="step-line done"></div>
+  <div class="step-dot active">3</div>
+</div>
+
+<div class="auth-title">Your sending address</div>
+<div class="auth-sub">Step 3 of 3 — every RFQ you send will come from this address</div>
+
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% elif taken %}
+<div class="alert alert-error">
+  This address is already in use. Please provide a different email address so we can generate an alternative.
+</div>
+{% endif %}
+
+{% if not taken %}
+<div style="background: var(--primary-light); border: 1px solid var(--border); border-radius: 6px; padding: 16px 18px; margin-bottom: 20px; text-align: center;">
+  <div class="text-sm text-muted">Your outgoing emails will always be sent from:</div>
+  <div style="font-size: 17px; font-weight: 700; color: var(--primary); margin-top: 6px; word-break: break-all;">{{ candidate }}</div>
+</div>
+<form method="post" action="{{ base_path }}/register/assign-email">
+  <button type="submit" class="btn btn-primary btn-block">Confirm &amp; finish</button>
+</form>
+<div style="text-align: center; margin-top: 12px;">
+  <a href="#" onclick="document.getElementById('alt-form').style.display='block'; this.parentElement.style.display='none'; return false;" class="text-sm">
+    Use a different address instead
+  </a>
+</div>
+<div id="alt-form" style="display:none; margin-top: 16px;">
+  {% include "_assign_email_alt_form.html" %}
+</div>
+{% else %}
+{% include "_assign_email_alt_form.html" %}
+{% endif %}
+{% endblock %}

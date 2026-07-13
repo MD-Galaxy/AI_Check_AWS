@@ -1,0 +1,15 @@
+.git
+.gitignore
+.venv
+__pycache__
+*.py[cod]
+*.egg-info
+.env
+.env.example
+.env.docker.example
+data/db.json
+data/attachments/
+.vscode
+.claude
+*.md
+!README.md
