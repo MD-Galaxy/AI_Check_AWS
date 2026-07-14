@@ -63,6 +63,14 @@ cp .env.docker.example .env
 docker compose up -d --build
 ```
 
+Or install `make`:
+
+| Platform            | How                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **macOS**           | `xcode-select --install` (Xcode Command Line Tools includes `make`), or `brew install make` if you use Homebrew                                                                                                                                                                                                                                                                                                           |
+| **Ubuntu / Debian** | `sudo apt update && sudo apt install make`                                                                                                                                                                                                                                                                                                                                                                                |
+| **Windows**         | `make` isn't native. Easiest is to just double-click [`run.bat`](run.bat) instead — it runs the same `docker compose` commands with no `make` needed. If you do want `make`: install via [Chocolatey](Chocolatey - The package manager for Windows) (`choco install make`), [Scoop](https://scoop.sh/) (`scoop install make`), or use WSL (Windows Subsystem for Linux) and install it there with `sudo apt install make` |
+
 The first run creates `.env` from [`.env.docker.example`](.env.docker.example)
 and stops so you can fill in your credentials. Open `.env`, fill in
 `SECRET_KEY`, the EngageLab and/or SendCloud block (`{PROVIDER}_API_USER`,
@@ -75,23 +83,23 @@ database migrations automatically on every start (safe to re-run — see
 
 Once it's up, open:
 
-| URL | What it is |
-| --- | --- |
-| `http://localhost:8000/` | Landing page — links to both POCs |
-| `http://localhost:8000/email_poc/` | EmailPOC |
+| URL                                    | What it is                        |
+| -------------------------------------- | --------------------------------- |
+| `http://localhost:8000/`               | Landing page — links to both POCs |
+| `http://localhost:8000/email_poc/`     | EmailPOC                          |
 | `http://localhost:8000/check-bedrock/` | Bedrock Availability check (JSON) |
 
 ### Everyday commands
 
-| Command         | What it does                                       |
-| ---------------- | --------------------------------------------------- |
-| `make up`        | Build (if needed) and start everything               |
-| `make logs`      | Follow every container's logs                        |
-| `make down`      | Stop everything (data is kept)                        |
-| `make restart`   | Restart the containers                                |
-| `make ps`        | Show container status                                 |
-| `make migrate`   | Manually re-run EmailPOC's database migrations         |
-| `make reset-db`  | Stop everything **and delete the database volume**     |
+| Command            | What it does                                                                               |
+| ------------------ | ------------------------------------------------------------------------------------------ |
+| `make up`          | Build (if needed) and start everything                                                     |
+| `make logs`        | Follow every container's logs                                                              |
+| `make down`        | Stop everything (data is kept)                                                             |
+| `make restart`     | Restart the containers                                                                     |
+| `make ps`          | Show container status                                                                      |
+| `make migrate`     | Manually re-run EmailPOC's database migrations                                             |
+| `make reset-db`    | Stop everything **and delete the database volume**                                         |
 | `make john-carter` | Open EmailPOC pre-logged-in as the demo "John Carter" user (needs `DEV_BYPASS_LOGIN=true`) |
 
 No `make`? Run the equivalent `docker compose ...` commands directly — see
@@ -118,7 +126,7 @@ docker compose up -d db
 
 # 3. Configure environment
 cp .env.example .env
-nano .env            # EngageLab/SendCloud credentials, and AWS_REGION + credentials
+nano .env            # EMAIL_PROVIDER + its credentials, and AWS_REGION + credentials
 
 # 4. Apply database migrations
 uv run alembic upgrade head

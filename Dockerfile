@@ -36,4 +36,8 @@ RUN chmod +x /app/docker/entrypoint.sh
 EXPOSE 8000
 
 ENTRYPOINT ["/app/docker/entrypoint.sh"]
-CMD ["uvicorn", "src.app:app", "--host", "0.0.0.0", "--port", "8000"]
+# --no-access-log: our own middleware (src/app.py) already logs every
+# request (with the real client IP, not just the ALB's) except /health
+# probes - Uvicorn's built-in access log would otherwise duplicate that
+# and, worse, still log every ALB health check every ~15s per AZ.
+CMD ["uvicorn", "src.app:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
