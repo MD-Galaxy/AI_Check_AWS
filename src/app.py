@@ -125,7 +125,14 @@ def create_app() -> FastAPI:
         entries are each relay hop. One line per request, so the
         ECS/CloudWatch log driver (which ships each stdout line as its own
         event) never shreds a single request's log into multiple entries.
+
+        The ALB hits /health every ~15s from every AZ purely as a liveness
+        probe - logging those would drown out real traffic, so they're
+        skipped here entirely.
         """
+        if request.url.path == "/health":
+            return await call_next(request)
+
         req_id = uuid.uuid4().hex[:8]
         forwarded = request.headers.get("x-forwarded-for")
         client_ip = forwarded.split(",")[0].strip() if forwarded else (
