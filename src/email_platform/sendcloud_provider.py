@@ -15,13 +15,21 @@ webhook.
 
 Configuration consumed (see :class:`src.config.Settings`):
 
-- ``SENDCLOUD_API_USER`` *(required)* – API user, from the SendCloud console.
-- ``SENDCLOUD_API_KEY`` *(required)* – API key, from the SendCloud console.
+- ``SENDCLOUD_API_USER`` *(required)* – API user, from the SendCloud console
+  (Singapore region).
+- ``SENDCLOUD_API_KEY`` *(required)* – API key, from the SendCloud console
+  (Singapore region).
 - ``SENDCLOUD_API_BASE`` – region base URL (Singapore by default).
 - ``SENDCLOUD_OUTBOUND_DOMAIN`` *(required)* – domain used to build the
   ``From`` and dynamic Reply-To addresses for sends made through SendCloud.
 - ``SENDCLOUD_COMPANY_NAME`` – display name in the ``From`` header (defaults
   to ``"Your Company"``).
+
+This module also defines :class:`SendCloudHKEmailProvider`, a Hong Kong/CN
+region variant used for Chinese suppliers (see setup_docs/aurora_send_cloud/
+AuroraSendCloud_Documentation.md §2) — same behavior, different (region-
+locked) credentials: ``SENDCLOUD_HK_API_USER``, ``SENDCLOUD_HK_API_KEY``,
+``SENDCLOUD_HK_API_BASE``.
 
 Example:
     >>> from src.email_platform.sendcloud_provider import (
@@ -231,3 +239,58 @@ class SendCloudEmailProvider(EmailMaster):
             "provider": self.provider_name,
             "provider_message_id": message_id,
         }
+
+
+class SendCloudHKEmailProvider(SendCloudEmailProvider):
+    """SendCloud, pinned to the Hong Kong/CN region for Chinese mailboxes.
+
+    Registered under the separate factory key ``"sendcloud_hk"`` (see
+    :mod:`src.email_platform.factory`) and selected internally by
+    :mod:`src.route` when the sender picks SendCloud for a Chinese supplier
+    — per setup_docs/aurora_send_cloud/AuroraSendCloud_Documentation.md §2,
+    the Hong Kong/CN region is "best used for ... Chinese systems sending to
+    Chinese mailboxes (QQ, NetEase)", while the Singapore region (the plain
+    ``"sendcloud"`` key) is best for everyone else. Everything about sending
+    is identical to :class:`SendCloudEmailProvider` except the credentials
+    and base URL, which are region-locked and therefore a wholly separate
+    pair (``SENDCLOUD_HK_API_USER``/``SENDCLOUD_HK_API_KEY``/
+    ``SENDCLOUD_HK_API_BASE``). :attr:`provider_name` intentionally stays
+    ``"sendcloud"`` (inherited, not overridden) so the outbound domain,
+    company name and the conversation's stored ``"provider"`` field read the
+    same regardless of which region actually sent the email.
+
+    Example:
+        >>> provider = SendCloudHKEmailProvider(settings, logger)
+        >>> provider.provider_name                     # doctest: +SKIP
+        'sendcloud'
+    """
+
+    def __init__(
+        self, settings: Settings, logger: logging.Logger
+    ) -> None:
+        """Validate the Hong Kong region's credentials and build its endpoint.
+
+        Deliberately calls :meth:`EmailMaster.__init__` directly (skipping
+        :meth:`SendCloudEmailProvider.__init__`) so it reads the HK-specific
+        settings instead of the Singapore ones.
+
+        Args:
+            settings (Settings): Shared application configuration.
+            logger (logging.Logger): Shared application logger.
+
+        Returns:
+            None
+
+        Raises:
+            ProviderConfigError: If ``SENDCLOUD_HK_API_USER`` or
+                ``SENDCLOUD_HK_API_KEY`` is not set.
+        """
+        EmailMaster.__init__(self, settings, logger)
+        self.api_user = self._require(
+            settings.sendcloud_hk_api_user, "SENDCLOUD_HK_API_USER"
+        )
+        self.api_key = self._require(
+            settings.sendcloud_hk_api_key, "SENDCLOUD_HK_API_KEY"
+        )
+        self.send_url = f"{settings.sendcloud_hk_api_base}/api/mail/send"
+        self.log.info("SendCloud (Hong Kong/CN region) provider initialised")

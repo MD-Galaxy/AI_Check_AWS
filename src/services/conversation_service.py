@@ -13,7 +13,12 @@ exposes three high-level operations the routes call:
    and classify the supplier's response.
 
 There is no single "active" provider anymore: the Send RFQ form has a
-required provider dropdown, and :meth:`ConversationService.get_provider`
+required provider dropdown plus a required "Supplier Type" dropdown
+(Chinese / Non-Chinese); the route layer resolves that pair to the actual
+provider key to use — e.g. SendCloud + Chinese resolves to the internal
+``sendcloud_hk`` key so the send goes through SendCloud's Hong Kong/CN
+region instead of its Singapore default (see ``src.route._SEND_KEYS``) —
+and :meth:`ConversationService.get_provider`
 builds (and caches) an :class:`~src.email_platform.email_master.EmailMaster`
 instance per provider key on demand via
 :class:`~src.email_platform.factory.EmailProviderFactory` — adding a new

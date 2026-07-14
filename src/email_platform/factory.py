@@ -25,17 +25,25 @@ from src.email_platform.elasticemail_provider import ElasticEmailProvider
 from src.email_platform.email_master import EmailMaster, ProviderConfigError
 from src.email_platform.engagelab_provider import EngageLabEmailProvider
 from src.email_platform.mailgun_provider import MailgunEmailProvider
-from src.email_platform.sendcloud_provider import SendCloudEmailProvider
+from src.email_platform.sendcloud_provider import (
+    SendCloudEmailProvider,
+    SendCloudHKEmailProvider,
+)
 from src.email_platform.sendgrid_provider import SendGridEmailProvider
 
 # Registry mapping the lowercase provider key to its implementation class.
 # Add a new provider by writing its class and registering it here — nothing
-# else in the application needs to change.
+# else in the application needs to change. "sendcloud_hk" is not a
+# user-facing "Provider" choice on the Send RFQ form — it's the internal key
+# src.route resolves to when the sender picks SendCloud for a Chinese
+# supplier (see src.route._SEND_KEYS), pinning the send to SendCloud's Hong
+# Kong/CN region instead of its Singapore default.
 _PROVIDERS: dict[str, type[EmailMaster]] = {
     "sendgrid": SendGridEmailProvider,
     "mailgun": MailgunEmailProvider,
     "elasticemail": ElasticEmailProvider,
     "sendcloud": SendCloudEmailProvider,
+    "sendcloud_hk": SendCloudHKEmailProvider,
     "engagelab": EngageLabEmailProvider,
 }
 
@@ -48,7 +56,7 @@ class EmailProviderFactory:
 
     Example:
         >>> EmailProviderFactory.supported()
-        ['sendgrid', 'mailgun', 'elasticemail', 'sendcloud', 'engagelab']
+        ['sendgrid', 'mailgun', 'elasticemail', 'sendcloud', 'sendcloud_hk', 'engagelab']
     """
 
     @classmethod

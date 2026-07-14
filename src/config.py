@@ -14,10 +14,15 @@ Configuration is grouped into three concerns:
    name each provider needs, e.g. ``ENGAGELAB_API_USER``,
    ``ENGAGELAB_OUTBOUND_DOMAIN``, ``ENGAGELAB_COMPANY_NAME``. There is no
    single "active" provider anymore — the sender picks a provider per send
-   (see the "Provider" dropdown on the Send RFQ page,
-   :func:`src.route.send_email_page`), and only the credentials for
-   *whichever* provider is selected need to be configured;
-   :meth:`Settings.provider_outbound_domain` /
+   on the Send RFQ form's "Provider" dropdown plus a "Supplier Type"
+   (Chinese / Non-Chinese); SendCloud and EngageLab both support either
+   type, but SendCloud sends through a wholly separate, region-locked
+   credential pair for Chinese suppliers (``SENDCLOUD_HK_*``, resolved to
+   the internal ``sendcloud_hk`` provider key) vs Non-Chinese
+   (``SENDCLOUD_*``), while SendGrid only supports Non-Chinese (see
+   ``src.route._SEND_KEYS`` and :func:`src.route.send_email_page`); only
+   the credentials for *whichever* resolved provider key is actually used
+   need to be configured. :meth:`Settings.provider_outbound_domain` /
    :meth:`Settings.provider_company_name` read them generically by
    provider key so adding a new provider needs no changes here — just its
    ``{PROVIDER}_*`` env vars, a new :class:`~src.email_platform.email_master.EmailMaster`
@@ -160,7 +165,7 @@ class Settings:
             "ELASTICEMAIL_API_URL", "https://api.elasticemail.com/v4"
         ).rstrip("/")
 
-        # ── SendCloud credentials ─────────────────────────────────────
+        # ── SendCloud credentials (Singapore region — non-Chinese suppliers) ──
         self.sendcloud_api_user = os.getenv("SENDCLOUD_API_USER")
         self.sendcloud_api_key = os.getenv("SENDCLOUD_API_KEY")
         # Singapore region (default): https://api.aurorasendcloud.com
@@ -168,6 +173,19 @@ class Settings:
         # CN (Hong Kong SAR) region: https://api-hk.aurorasendcloud.com
         self.sendcloud_api_base = os.getenv(
             "SENDCLOUD_API_BASE", "https://api.aurorasendcloud.com"
+        ).rstrip("/")
+
+        # ── SendCloud credentials (Hong Kong/CN region — Chinese suppliers) ──
+        # Region-locked: a Singapore apiUser/apiKey pair is rejected against
+        # this base URL and vice versa (see
+        # setup_docs/aurora_send_cloud/AuroraSendCloud_Documentation.md §2),
+        # so this is a wholly separate credential pair from the Singapore one
+        # above, used by :class:`~src.email_platform.sendcloud_provider.SendCloudHKEmailProvider`
+        # when the sender picks SendCloud for a Chinese supplier.
+        self.sendcloud_hk_api_user = os.getenv("SENDCLOUD_HK_API_USER")
+        self.sendcloud_hk_api_key = os.getenv("SENDCLOUD_HK_API_KEY")
+        self.sendcloud_hk_api_base = os.getenv(
+            "SENDCLOUD_HK_API_BASE", "https://api-hk.aurorasendcloud.com"
         ).rstrip("/")
 
         # ── EngageLab credentials ────────────────────────────────────
