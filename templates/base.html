@@ -602,7 +602,7 @@
         <div class="topbar-avatar">{{ current_user.full_name[0] | upper }}</div>
         <div>
           <div class="topbar-name">{{ current_user.full_name }}</div>
-          <div class="topbar-email">{{ current_user.sending_email or current_user.personal_email }}</div>
+          <div class="topbar-email">{{ current_user.personal_email }}</div>
         </div>
       </div>
       <form method="post" action="{{ base_path }}/logout">

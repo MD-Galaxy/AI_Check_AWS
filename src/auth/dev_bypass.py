@@ -24,9 +24,9 @@ router = APIRouter()
 
 _JOHN_CARTER_FIRST_NAME = "John"
 _JOHN_CARTER_LAST_NAME = "Carter"
-_JOHN_CARTER_PERSONAL_EMAIL = "john.carter@local.dev"
+_JOHN_CARTER_PERSONAL_EMAIL = "john.carter@mail.ims.com"
 _JOHN_CARTER_LOCAL_PART = "john.carter"
-_FALLBACK_DOMAIN = "local.dev"
+_FALLBACK_DOMAIN = "mail.ims.com"
 
 
 async def _get_or_create_john_carter(repo: Repository, outbound_domain: str) -> dict:

@@ -9,7 +9,7 @@ and the `users` table from the old hardcoded PREDEFINED_USERS list (both
 source modules are deleted now that real tables replace them — see
 MIGRATION_PLAN.md §2.4). Seeded users get a random, unusable password hash
 and a derived `sending_email` (local-part of their personal email + the
-configured INBOUND_DOMAIN) so the app keeps working before the registration
+configured default outbound domain) so the app keeps working before the registration
 / login flow (MIGRATION_PLAN.md §3) exists. The first user is marked
 is_admin so the future admin overview has at least one account to use.
 """
@@ -94,13 +94,13 @@ def upgrade() -> None:
         sa.column("is_admin", sa.Boolean()),
     )
 
-    inbound_domain = get_settings().inbound_domain
+    outbound_domain = get_settings().default_outbound_domain
     rows = []
     for index, user in enumerate(PREDEFINED_USERS):
         first_name, _, last_name = user["full_name"].partition(" ")
         local_part = user["email"].split("@", 1)[0]
         sending_email = (
-            f"{local_part}@{inbound_domain}" if inbound_domain else None
+            f"{local_part}@{outbound_domain}" if outbound_domain else None
         )
         rows.append({
             "id": uuid.UUID(user["id"]),
