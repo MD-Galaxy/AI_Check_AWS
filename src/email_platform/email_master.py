@@ -7,10 +7,20 @@ identical no matter which provider actually transmits the message:
 - :meth:`EmailMaster.generate_conversation_id` – mint a conversation id.
 - :meth:`EmailMaster.build_dynamic_email` – encode ``user_id`` /
   ``conv_id`` into a per-conversation address.
+- :meth:`EmailMaster.build_sending_email` – build the stable per-user
+  ``From`` address (no conv_id) on this provider's own outbound domain.
 - :meth:`EmailMaster.parse_dynamic_email` – decode that address back into
   its ``user_id`` / ``conv_id`` (also used by the inbound webhook).
 - :meth:`EmailMaster.build_rfq_subject` / :meth:`EmailMaster.build_rfq_html`
   – render the standard RFQ subject line and HTML body.
+
+Each instance is constructed with its own :attr:`EmailMaster.outbound_domain`
+and :attr:`EmailMaster.company_name`, read generically from
+``{PROVIDER}_OUTBOUND_DOMAIN`` / ``{PROVIDER}_COMPANY_NAME`` via
+:meth:`~src.config.Settings.provider_outbound_domain` /
+:meth:`~src.config.Settings.provider_company_name` — see
+:mod:`src.services.conversation_service`, which builds one instance per
+selected provider at send time rather than a single app-wide instance.
 
 Each concrete provider only has to implement two members: the
 :attr:`EmailMaster.provider_name` property and the
@@ -50,7 +60,7 @@ class EmailProviderError(Exception):
 class ProviderConfigError(EmailProviderError):
     """Raised when a provider is missing required configuration.
 
-    For example, selecting ``EMAIL_PROVIDER=mailgun`` without setting
+    For example, picking ``mailgun`` on the Send RFQ form without setting
     ``MAILGUN_API_KEY`` raises this error with a message naming the missing
     variable.
     """
@@ -89,15 +99,31 @@ class EmailMaster(ABC):
     ) -> None:
         """Store the shared configuration and logger.
 
+        Also resolves this instance's own outbound domain and display name
+        from ``{PROVIDER}_OUTBOUND_DOMAIN`` / ``{PROVIDER}_COMPANY_NAME``
+        (see :meth:`~src.config.Settings.provider_outbound_domain`), using
+        :attr:`provider_name` — safe to read here since subclasses implement
+        it as a property that does not depend on any state set later in
+        their own ``__init__``.
+
         Args:
             settings (Settings): The application configuration snapshot.
             logger (logging.Logger): The shared application logger.
 
         Returns:
             None
+
+        Raises:
+            ProviderConfigError: If ``{PROVIDER}_OUTBOUND_DOMAIN`` is not
+                set for this provider.
         """
         self.settings = settings
         self.log = logger
+        self.outbound_domain = self._require(
+            settings.provider_outbound_domain(self.provider_name),
+            f"{self.provider_name.upper()}_OUTBOUND_DOMAIN",
+        )
+        self.company_name = settings.provider_company_name(self.provider_name)
 
     # ── Provider identity (must be overridden) ───────────────────────
 
@@ -138,6 +164,9 @@ class EmailMaster(ABC):
         ``"James Whitfield"`` → ``"JamesWhitfield"``) and combines it with the
         conversation/thread id via a hyphen so the address is human-readable
         and the conv_id can be recovered from any reply that arrives there.
+        Uses this instance's own :attr:`outbound_domain` — the provider
+        selected for this particular send (see
+        :mod:`src.services.conversation_service`).
 
         Args:
             user_name (str): The user's display name (e.g. ``"James Whitfield"``).
@@ -153,16 +182,39 @@ class EmailMaster(ABC):
             'JamesWhitfield-3fa9c1b2@mail.jobsetu.online'
         """
         camel = "".join(word.capitalize() for word in user_name.split())
-        return f"{camel}-{conv_id}@{self.settings.inbound_domain}"
+        return f"{camel}-{conv_id}@{self.outbound_domain}"
+
+    def build_sending_email(self, user_name: str) -> str:
+        """Construct this provider's stable per-user ``From`` address.
+
+        Same CamelCase conversion as :meth:`build_dynamic_email` but with no
+        conv_id suffix, since this identifies the sending user rather than
+        one conversation. Rebuilt fresh for whichever provider is selected
+        at send time, so the domain always matches a domain that provider
+        is actually authorised to send from.
+
+        Args:
+            user_name (str): The user's display name (e.g. ``"James Whitfield"``).
+
+        Returns:
+            str: Fully qualified address, e.g.
+                ``"JamesWhitfield@mail.jobsetu.online"``.
+
+        Example:
+            >>> provider.build_sending_email("James Whitfield")
+            'JamesWhitfield@mail.jobsetu.online'
+        """
+        camel = "".join(word.capitalize() for word in user_name.split())
+        return f"{camel}@{self.outbound_domain}"
 
     def parse_dynamic_email(self, email_address: str) -> dict | None:
         """Extract ``conv_id`` from a dynamic address.
 
         Supports two address formats:
 
-        * **Current**: ``{CamelCaseName}-{conv_id}@{INBOUND_DOMAIN}``
+        * **Current**: ``{CamelCaseName}-{conv_id}@{this provider's outbound_domain}``
           e.g. ``JamesWhitfield-3fa9c1b2@mail.jobsetu.online``
-        * **Legacy** (backward-compat): ``{prefix}_conv{conv_id}@{INBOUND_DOMAIN}``
+        * **Legacy** (backward-compat): ``{prefix}_conv{conv_id}@{this provider's outbound_domain}``
           e.g. ``james.whitfield_conv3fa9c1b2@mail.jobsetu.online``
 
         Args:
@@ -171,8 +223,9 @@ class EmailMaster(ABC):
 
         Returns:
             dict | None: ``{"conv_id": str}`` on success, or ``None`` when
-                the address does not match any known pattern (or when
-                ``INBOUND_DOMAIN`` is not configured).
+                the address does not match any known pattern (or when this
+                provider's ``{PROVIDER}_OUTBOUND_DOMAIN`` is not
+                configured).
 
         Example:
             >>> provider.parse_dynamic_email(
@@ -181,14 +234,14 @@ class EmailMaster(ABC):
             >>> provider.parse_dynamic_email("nobody@other.com") is None
             True
         """
-        inbound_domain = self.settings.inbound_domain
-        if not inbound_domain:
+        if not self.outbound_domain:
             self.log.error(
-                "INBOUND_DOMAIN is not set; cannot match inbound address"
+                "%s_OUTBOUND_DOMAIN is not set; cannot match inbound address",
+                self.provider_name.upper(),
             )
             return None
 
-        domain = re.escape(inbound_domain)
+        domain = re.escape(self.outbound_domain)
         patterns = [
             # Current format: CamelCaseName-{8hex}@domain
             rf"[A-Za-z0-9]+-([a-f0-9]{{8}})@{domain}(?![\w.-])",
@@ -311,7 +364,7 @@ class EmailMaster(ABC):
             >>> "Acme" in html
             True
         """
-        company = self.settings.company_name
+        company = self.company_name
         # Built as a list of short lines so no single source line exceeds
         # the 79-column limit; ``"".join`` reassembles the final markup.
         # Small base64-encoded blue banner (320×40 PNG) for image-tracking

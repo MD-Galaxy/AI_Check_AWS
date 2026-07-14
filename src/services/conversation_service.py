@@ -1,24 +1,33 @@
 """Conversation orchestration for EmailPOC.
 
 :class:`ConversationService` is the single place that coordinates the
-database, the active email provider and the active inbound webhook parser.
-It exposes three high-level operations the routes call:
+database, outbound email providers and the inbound webhook parser. It
+exposes three high-level operations the routes call:
 
 1. :meth:`ConversationService.create_conversation` – mint a conversation
-   and its dynamic address.
-2. :meth:`ConversationService.send_rfq` – render and send the RFQ email,
-   then persist the sent record.
+   and its dynamic address, using whichever provider the sender picked.
+2. :meth:`ConversationService.send_rfq` – render and send the RFQ email
+   through that same provider, then persist the sent record.
 3. :meth:`ConversationService.handle_inbound` – parse an inbound webhook
    request, match it to a conversation, store attachments and the reply,
    and classify the supplier's response.
 
-Keeping this logic out of the routes means the same flow works unchanged no
-matter which provider is configured.
+There is no single "active" provider anymore: the Send RFQ form has a
+required provider dropdown, and :meth:`ConversationService.get_provider`
+builds (and caches) an :class:`~src.email_platform.email_master.EmailMaster`
+instance per provider key on demand via
+:class:`~src.email_platform.factory.EmailProviderFactory` — adding a new
+provider needs no changes here. Inbound webhook parsing still uses one
+fixed provider instance (``self.email``, injected at construction — see
+:func:`src.app.create_app`), since only one provider's inbound payload
+format is understood by the single ``POST /webhooks/inbound`` endpoint.
 
 Example:
     >>> service = ConversationService(           # doctest: +SKIP
     ...     db, email_provider, webhook_parser, settings, logger)
-    >>> conv = service.create_conversation("42", "buyer@acme.com", "Acme")
+    >>> conv = service.create_conversation(       # doctest: +SKIP
+    ...     "42", "Buyer Name", "supplier@acme.com", "Acme",
+    ...     provider_name="engagelab")
     >>> conv["status"]                            # doctest: +SKIP
     'open'
 """
@@ -32,7 +41,8 @@ from fastapi import Request
 
 from src.config import Settings
 from src.db.repository import DuplicateConversationTokenError, Repository
-from src.email_platform.email_master import EmailMaster
+from src.email_platform.email_master import EmailMaster, ProviderConfigError
+from src.email_platform.factory import EmailProviderFactory
 from src.webhook_factory.webhook_master import (
     InboundEmail,
     WebhookParseError,
@@ -55,8 +65,11 @@ class ConversationService:
 
     Attributes:
         db (Repository): The async Postgres persistence layer.
-        email (EmailMaster): The active outbound email provider. Its
-            inherited address helpers are reused on the inbound side so the
+        email (EmailMaster): The default outbound email provider — used for
+            inbound webhook parsing and for any conversation created without
+            an explicit ``provider_name`` (e.g. a brand-new headerless
+            supplier email, see :meth:`_match_new_thread`). Its inherited
+            address helpers are reused on the inbound side so the
             encode/decode logic has a single source of truth.
         webhook (WebhookParserMaster): The active inbound webhook parser.
         settings (Settings): Shared application configuration.
@@ -79,7 +92,8 @@ class ConversationService:
 
         Args:
             db (Repository): The async Postgres persistence layer.
-            email_provider (EmailMaster): The active outbound provider.
+            email_provider (EmailMaster): The default outbound provider (see
+                :attr:`email`).
             webhook_parser (WebhookParserMaster): The active inbound parser.
             settings (Settings): Shared application configuration.
             logger (logging.Logger): Shared application logger.
@@ -92,6 +106,38 @@ class ConversationService:
         self.webhook = webhook_parser
         self.settings = settings
         self.log = logger
+        self._provider_cache: dict[str, EmailMaster] = {
+            email_provider.provider_name: email_provider
+        }
+
+    def get_provider(self, provider_name: str) -> EmailMaster:
+        """Return the :class:`EmailMaster` instance for ``provider_name``.
+
+        Instances are built lazily (via
+        :class:`~src.email_platform.factory.EmailProviderFactory`, which
+        validates that provider's credentials) and cached, so selecting the
+        same provider on a later send reuses the same instance instead of
+        re-validating configuration every time.
+
+        Args:
+            provider_name (str): Provider key selected on the Send RFQ form,
+                e.g. ``"engagelab"``.
+
+        Returns:
+            EmailMaster: The (possibly newly built) provider instance.
+
+        Raises:
+            ProviderConfigError: If ``provider_name`` is empty, unknown, or
+                that provider is missing required configuration.
+        """
+        key = (provider_name or "").strip().lower()
+        if not key:
+            raise ProviderConfigError("No email provider selected.")
+        if key not in self._provider_cache:
+            self._provider_cache[key] = EmailProviderFactory.create(
+                key, self.settings, self.log
+            )
+        return self._provider_cache[key]
 
     # ── Outbound ─────────────────────────────────────────────────────
 
@@ -103,6 +149,7 @@ class ConversationService:
         supplier_name: str = "",
         project_id: str = "",
         project_name: str = "",
+        provider_name: str | None = None,
     ) -> dict:
         """Create and persist a new tracked conversation.
 
@@ -123,6 +170,11 @@ class ConversationService:
                 When provided this is stored as the "Conversation ID" for
                 grouping; the generated token handles email routing.
             project_name (str): Product name from the selected project.
+            provider_name (str | None): Provider picked on the Send RFQ
+                form (see :meth:`get_provider`). ``None`` uses :attr:`email`,
+                the default provider — used when a conversation is opened
+                from the inbound side (:meth:`_match_new_thread`), where
+                there is no form selection to read.
 
         Returns:
             dict: The newly created conversation record.
@@ -130,13 +182,16 @@ class ConversationService:
         Raises:
             DuplicateConversationTokenError: If every attempt collides
                 (astronomically unlikely with an 8-char hex token space).
+            ProviderConfigError: If ``provider_name`` is unknown or missing
+                required configuration.
         """
+        provider = self.get_provider(provider_name) if provider_name else self.email
         now = datetime.now(timezone.utc).isoformat()
         last_error: DuplicateConversationTokenError | None = None
 
         for _ in range(_MAX_TOKEN_ATTEMPTS):
-            conv_id = self.email.generate_conversation_id()
-            email_addr = self.email.build_dynamic_email(user_name, conv_id)
+            conv_id = provider.generate_conversation_id()
+            email_addr = provider.build_dynamic_email(user_name, conv_id)
 
             conversation = {
                 "conv_id": conv_id,
@@ -148,7 +203,7 @@ class ConversationService:
                 "supplier_email": supplier_email,
                 "supplier_name": supplier_name,
                 "email_address": email_addr,
-                "provider": self.email.provider_name,
+                "provider": provider.provider_name,
                 "status": "open",
                 "created_at": now,
                 "reply_count": 0,
@@ -168,7 +223,7 @@ class ConversationService:
                 conv_id,
                 project_id or "none",
                 user_id,
-                self.email.provider_name,
+                provider.provider_name,
             )
             return conversation
 
@@ -184,13 +239,16 @@ class ConversationService:
         product_name: str,
         quantity: int,
         target_price: str,
+        provider_name: str,
         attachments: list | None = None,
     ) -> dict:
         """Render and send an RFQ email, then persist the sent record.
 
-        The ``From`` header is the user's permanent ``sending_email``
-        (assigned at registration, see
-        :meth:`~src.db.repository.Repository.assign_sending_email`); the
+        The ``From`` header is rebuilt fresh for this send via
+        :meth:`~src.email_platform.email_master.EmailMaster.build_sending_email`
+        on the selected provider (so its domain matches whatever that
+        provider is actually authorised to send from — different providers
+        use different ``{PROVIDER}_OUTBOUND_DOMAIN`` values); the
         ``Reply-To`` header is the conversation's dynamic address so that
         replies route back to the inbound webhook. After a successful send
         the record is appended to the conversation and the product metadata
@@ -204,6 +262,8 @@ class ConversationService:
             product_name (str): Product being quoted.
             quantity (int): Number of units requested.
             target_price (str): Buyer's target unit price, e.g. ``"$12.00"``.
+            provider_name (str): Provider picked on the Send RFQ form (see
+                :meth:`get_provider`).
 
         Returns:
             dict: Summary with keys ``status_code``, ``provider``, ``from``,
@@ -219,20 +279,26 @@ class ConversationService:
             ...     user_id="42", conv_id="3fa9c1b2",
             ...     supplier_email="buyer@acme.com",
             ...     supplier_name="Acme", product_name="X200",
-            ...     quantity=500, target_price="$12.00")
+            ...     quantity=500, target_price="$12.00",
+            ...     provider_name="engagelab")
             >>> result["status_code"]                 # doctest: +SKIP
             202
         """
+        provider = self.get_provider(provider_name)
         conversation = await self.db.get_conversation(conv_id)
+        user = await self.db.get_user_auth_by_id(user_id)
         reply_to = (
             conversation["email_address"]
             if conversation
-            else self.email.build_dynamic_email(user_id, conv_id)
+            else provider.build_dynamic_email(
+                user["full_name"] if user else user_id, conv_id
+            )
         )
-        user = await self.db.get_user_auth_by_id(user_id)
-        from_email = (user["sending_email"] if user else None) or self.settings.from_email
-        subject = self.email.build_rfq_subject(conv_id, product_name)
-        html_body = self.email.build_rfq_html(
+        from_email = (
+            provider.build_sending_email(user["full_name"]) if user else None
+        )
+        subject = provider.build_rfq_subject(conv_id, product_name)
+        html_body = provider.build_rfq_html(
             user_id=user_id,
             conv_id=conv_id,
             supplier_name=supplier_name,
@@ -242,11 +308,11 @@ class ConversationService:
         )
         now = datetime.now(timezone.utc).isoformat()
 
-        # Delegate transmission to the active provider. Any failure raises
+        # Delegate transmission to the selected provider. Any failure raises
         # an EmailProviderError, which the route turns into a user message
-        result = self.email.send_email(
+        result = provider.send_email(
             from_email=from_email,
-            from_name=self.settings.company_name,
+            from_name=provider.company_name,
             to_email=supplier_email,
             to_name=supplier_name,
             subject=subject,

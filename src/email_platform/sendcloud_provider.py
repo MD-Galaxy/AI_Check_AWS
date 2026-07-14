@@ -7,18 +7,21 @@ Python SDK, so this mirrors the approach already used for
 :class:`~src.email_platform.mailgun_provider.MailgunEmailProvider`. The
 ``From`` header is whatever address the caller passes in —
 :meth:`~src.services.conversation_service.ConversationService.send_rfq`
-passes each user's permanent ``sending_email`` (falling back to
-``FROM_EMAIL`` if unset) — and ``replyTo`` carries the dynamic conversation
-address so supplier replies route back through this app's webhook.
+builds it fresh per send via
+:meth:`~src.email_platform.email_master.EmailMaster.build_sending_email` on
+whichever provider the sender picked — and ``replyTo`` carries the dynamic
+conversation address so supplier replies route back through this app's
+webhook.
 
 Configuration consumed (see :class:`src.config.Settings`):
 
 - ``SENDCLOUD_API_USER`` *(required)* – API user, from the SendCloud console.
 - ``SENDCLOUD_API_KEY`` *(required)* – API key, from the SendCloud console.
 - ``SENDCLOUD_API_BASE`` – region base URL (Singapore by default).
-- ``FROM_EMAIL`` – fallback sender identity used only when a user has no
-  ``sending_email`` yet.
-- ``COMPANY_NAME`` – display name in the ``From`` header.
+- ``SENDCLOUD_OUTBOUND_DOMAIN`` *(required)* – domain used to build the
+  ``From`` and dynamic Reply-To addresses for sends made through SendCloud.
+- ``SENDCLOUD_COMPANY_NAME`` – display name in the ``From`` header (defaults
+  to ``"Your Company"``).
 
 Example:
     >>> from src.email_platform.sendcloud_provider import (
@@ -122,8 +125,8 @@ class SendCloudEmailProvider(EmailMaster):
         provider message id.
 
         Args:
-            from_email (str): Sender address for the ``from`` field — the
-                user's ``sending_email``, or ``FROM_EMAIL`` as a fallback.
+            from_email (str): Sender address for the ``from`` field — built
+                per send via :meth:`EmailMaster.build_sending_email`.
             from_name (str): Sender display name.
             to_email (str): Recipient address.
             to_name (str): Recipient display name (unused by the API but

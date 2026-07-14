@@ -1,8 +1,8 @@
 """Inbound webhook parser for SendGrid Inbound Parse.
 
 SendGrid's Inbound Parse webhook POSTs ``multipart/form-data`` for every
-message delivered to ``*@{INBOUND_DOMAIN}``. This parser converts that
-payload into a normalised :class:`InboundEmail`.
+message delivered to ``*@{SENDGRID_OUTBOUND_DOMAIN}``. This parser converts
+that payload into a normalised :class:`InboundEmail`.
 
 Relevant SendGrid form fields:
 

@@ -10,10 +10,15 @@ as the ``h:Reply-To`` form field) carries the dynamic conversation address.
 Configuration consumed (see :class:`src.config.Settings`):
 
 - ``MAILGUN_API_KEY`` *(required)* – Mailgun private API key.
-- ``MAILGUN_DOMAIN`` *(required)* – verified sending domain.
+- ``MAILGUN_DOMAIN`` *(required)* – verified sending domain used in the
+  Mailgun API endpoint path (``/v3/{domain}/messages``).
 - ``MAILGUN_API_BASE`` – ``https://api.mailgun.net`` (US, default) or
   ``https://api.eu.mailgun.net`` (EU).
-- ``COMPANY_NAME`` – display name in the ``From`` header.
+- ``MAILGUN_OUTBOUND_DOMAIN`` *(required)* – domain used to build the
+  ``From`` and dynamic Reply-To addresses (keep it equal to
+  ``MAILGUN_DOMAIN`` above unless you know Mailgun accepts a mismatch).
+- ``MAILGUN_COMPANY_NAME`` – display name in the ``From`` header (defaults
+  to ``"Your Company"``).
 
 Example:
     >>> from src.email_platform.mailgun_provider import (

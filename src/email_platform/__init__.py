@@ -10,12 +10,14 @@ This package implements the *strategy + factory* pattern for sending email:
   :mod:`src.email_platform.elasticemail_provider` are the concrete
   providers, each implementing only the provider-specific
   :meth:`EmailMaster.send_email`.
-- :mod:`src.email_platform.factory` exposes
-  :class:`EmailProviderFactory`, which returns the provider selected by the
-  ``EMAIL_PROVIDER`` environment variable.
+- :mod:`src.email_platform.factory` exposes :class:`EmailProviderFactory`,
+  which returns the provider instance for a given provider key — chosen per
+  send on the Send RFQ form's "Provider" dropdown rather than a single
+  app-wide setting (see
+  :meth:`~src.services.conversation_service.ConversationService.get_provider`).
 
-Import the factory (not the concrete providers) so the active provider
-stays a configuration choice:
+Import the factory (not the concrete providers) so the sender's choice
+stays a runtime, not a code, decision:
 
     >>> from src.email_platform.factory import EmailProviderFactory
 """

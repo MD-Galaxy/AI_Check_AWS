@@ -2,8 +2,8 @@
 
 EngageLab's Inbound Route posts a supplier reply to our
 ``POST /webhooks/inbound`` endpoint once the MX record for
-``INBOUND_DOMAIN`` points at EngageLab and a webhook is bound to the
-sending API_USER.
+``ENGAGELAB_OUTBOUND_DOMAIN`` points at EngageLab and a webhook is bound to
+the sending API_USER.
 
 The setup guide (``setup_docs/engagelab_guide/engagelab_setup.md``,
 section 6) originally assumed a flat ``sender``/``recipient``/``message``

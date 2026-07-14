@@ -1,10 +1,12 @@
-"""Factory that builds the active outbound email provider.
+"""Factory that builds outbound email provider instances.
 
-:class:`EmailProviderFactory` maps the ``EMAIL_PROVIDER`` configuration
-value to the matching :class:`~src.email_platform.email_master.EmailMaster`
+:class:`EmailProviderFactory` maps a provider key — picked per send on the
+Send RFQ form's "Provider" dropdown, see
+:meth:`~src.services.conversation_service.ConversationService.get_provider`
+— to the matching :class:`~src.email_platform.email_master.EmailMaster`
 subclass and returns a ready-to-use instance. Callers never import a
-concrete provider directly, so swapping providers is a one-line ``.env``
-change with no code edits.
+concrete provider directly, so adding a provider is a new subclass + one
+line here, with no changes anywhere else.
 
 Example:
     >>> from src.email_platform.factory import EmailProviderFactory
@@ -84,7 +86,7 @@ class EmailProviderFactory:
         if provider_cls is None:
             supported = ", ".join(_PROVIDERS)
             raise ProviderConfigError(
-                f"Unknown EMAIL_PROVIDER '{provider_name}'. "
+                f"Unknown email provider '{provider_name}'. "
                 f"Supported providers: {supported}."
             )
         logger.info("Selected email provider: %s", key)

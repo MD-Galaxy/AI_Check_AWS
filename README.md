@@ -65,8 +65,9 @@ docker compose up -d --build
 
 The first run creates `.env` from [`.env.docker.example`](.env.docker.example)
 and stops so you can fill in your credentials. Open `.env`, fill in
-`SECRET_KEY`, `INBOUND_DOMAIN`, `FROM_EMAIL`, the EngageLab or SendCloud
-pair, and the AWS/Anthropic variables — then run the same command again.
+`SECRET_KEY`, the EngageLab and/or SendCloud block (`{PROVIDER}_API_USER`,
+`{PROVIDER}_API_KEY`, `{PROVIDER}_OUTBOUND_DOMAIN`), and the AWS/Anthropic
+variables — then run the same command again.
 This time it builds the image, starts Postgres, waits for it to be
 healthy, and starts the app container. Its entrypoint also applies
 database migrations automatically on every start (safe to re-run — see
@@ -117,7 +118,7 @@ docker compose up -d db
 
 # 3. Configure environment
 cp .env.example .env
-nano .env            # EMAIL_PROVIDER + its credentials, and AWS_REGION + credentials
+nano .env            # EngageLab/SendCloud credentials, and AWS_REGION + credentials
 
 # 4. Apply database migrations
 uv run alembic upgrade head

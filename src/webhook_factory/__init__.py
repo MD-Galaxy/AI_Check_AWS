@@ -14,8 +14,11 @@ provider-agnostic.
   :mod:`src.webhook_factory.mailgun_webhook` and
   :mod:`src.webhook_factory.elasticemail_webhook` are the concrete parsers.
 - :mod:`src.webhook_factory.factory` exposes
-  :class:`WebhookParserFactory`, which returns the parser matching
-  ``EMAIL_PROVIDER``.
+  :class:`WebhookParserFactory`, which returns the parser for a given
+  provider key — the app builds exactly one at startup
+  (``src.app._INBOUND_EMAIL_PROVIDER``) since ``POST /webhooks/inbound``
+  only understands one payload format at a time, independent of which
+  provider a sender picks per outbound send.
 
 Import the factory (not the concrete parsers):
 

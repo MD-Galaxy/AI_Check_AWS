@@ -709,7 +709,7 @@ class Repository:
             )
 
     def _generate_message_id(self) -> str:
-        domain = self.settings.inbound_domain or "local"
+        domain = self.settings.default_outbound_domain or "local"
         return f"<{uuid.uuid4().hex}@{domain}>"
 
     @staticmethod
