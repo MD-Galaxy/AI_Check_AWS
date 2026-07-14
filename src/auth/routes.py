@@ -212,7 +212,7 @@ async def register_step3(request: Request):
     settings = request.app.state.settings
     templates = request.app.state.templates
 
-    candidate = f"{_local_part(user['personal_email'])}@{settings.inbound_domain}"
+    candidate = f"{_local_part(user['personal_email'])}@{settings.default_outbound_domain}"
     taken = await repo.sending_email_exists(candidate)
     return templates.TemplateResponse(request, "register_step3.html", {
         "candidate": candidate,
@@ -236,7 +236,7 @@ async def register_step3_submit(
     if alternate_email.strip():
         normalized_alt = _normalized_email(alternate_email)
         if not normalized_alt:
-            candidate = f"{_local_part(user['personal_email'])}@{settings.inbound_domain}"
+            candidate = f"{_local_part(user['personal_email'])}@{settings.default_outbound_domain}"
             return templates.TemplateResponse(request, "register_step3.html", {
                 "candidate": candidate,
                 "taken": True,
@@ -244,7 +244,7 @@ async def register_step3_submit(
             }, status_code=400)
         source_email = normalized_alt
 
-    candidate = f"{_local_part(source_email)}@{settings.inbound_domain}"
+    candidate = f"{_local_part(source_email)}@{settings.default_outbound_domain}"
     try:
         activated_user = await repo.assign_sending_email(user["id"], candidate)
     except DuplicateSendingEmailError:

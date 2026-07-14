@@ -138,43 +138,45 @@
     <div class="section-card">
       <div class="section-header">
         <div class="section-num">2</div>
-        <div class="section-title">Default User — "John Carter" (Bypass Login)</div>
+        <div class="section-title">Check Email Functionality</div>
       </div>
       <div class="section-body">
         <div class="section-desc">
-          A shortcut for quickly exploring EmailPOC without registering: it skips the whole
-          login/registration wizard, logs you in as a fixed demo user named
-          <strong>John Carter</strong>, and drops you straight on the Send RFQ page.
+          The fastest way to test the RFQ email flow end-to-end without going through
+          registration or login. One click logs you in as a ready-made demo user,
+          <strong>John Carter (john.carter@mail.jobsetu.online)</strong>, and takes you straight to the Send RFQ page so
+          you can send a real RFQ email and see the flow in action.
         </div>
-        {% if dev_bypass_enabled %}
+        <!-- {% if dev_bypass_enabled %}
         <div class="note">Enabled — DEV_BYPASS_LOGIN=true</div>
         {% else %}
         <div class="note warning">Disabled — set DEV_BYPASS_LOGIN=true in .env to use this button (it 404s otherwise).</div>
-        {% endif %}
+        {% endif %} -->
         <div class="btn-row">
-          <a class="btn btn-primary" target="_blank" href="{{ base_path }}/dev/login-john-carter">Continue as John Carter</a>
+          <a class="btn btn-primary" target="_blank" href="{{ base_path }}/dev/login-john-carter">Testing with John Carter</a>
         </div>
       </div>
     </div>
 
     <!-- 3. Normal email POC flow -->
-    <div class="section-card">
+    <!-- <div class="section-card">
       <div class="section-header">
         <div class="section-num">3</div>
-        <div class="section-title">EmailPOC — Normal Flow</div>
+        <div class="section-title">Full EmailPOC Journey — Register &amp; Send RFQs</div>
       </div>
       <div class="section-body">
         <div class="section-desc">
-          The real user journey: create an account through the 3-step registration wizard
-          (or log in if you already have one), then send RFQ emails to suppliers from a
-          per-conversation dynamic address and track replies from your personal dashboard.
+          Experience the complete, real-world flow as an actual user would: sign up through
+          the 3-step registration wizard (or log in with an existing account), send RFQ
+          emails to suppliers from your own per-conversation dynamic address, and track
+          every reply from your personal dashboard.
         </div>
         <div class="btn-row">
           <a class="btn btn-primary" target="_blank" rel="noopener" href="{{ base_path }}/register">Register</a>
           <a class="btn btn-secondary" target="_blank" rel="noopener" href="{{ base_path }}/login">Login</a>
         </div>
       </div>
-    </div>
+    </div> -->
 
   </div>
 

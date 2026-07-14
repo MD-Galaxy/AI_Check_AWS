@@ -229,3 +229,4 @@ __marimo__/
 .env
 data/attachments/
 data/db.json
+setup_docs/

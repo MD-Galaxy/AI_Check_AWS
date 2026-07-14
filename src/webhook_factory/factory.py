@@ -1,10 +1,11 @@
-"""Factory that builds the active inbound webhook parser.
+"""Factory that builds inbound webhook parser instances.
 
-:class:`WebhookParserFactory` maps the ``EMAIL_PROVIDER`` configuration
-value to the matching
+:class:`WebhookParserFactory` maps a provider key to the matching
 :class:`~src.webhook_factory.webhook_master.WebhookParserMaster` subclass
-so the single ``POST /webhooks/inbound`` route can decode whichever
-provider's payload arrives. It mirrors
+so the single ``POST /webhooks/inbound`` route can decode that provider's
+payload. The app builds exactly one parser at startup
+(``src.app._INBOUND_EMAIL_PROVIDER``), since this one endpoint only
+understands one payload format at a time. It mirrors
 :class:`src.email_platform.factory.EmailProviderFactory` on the inbound
 side.
 
@@ -32,8 +33,8 @@ from src.webhook_factory.sendgrid_webhook import SendGridWebhookParser
 from src.webhook_factory.webhook_master import WebhookParserMaster
 
 # Registry mapping the lowercase provider key to its parser class. Keep the
-# keys identical to those in the email-provider factory so a single
-# ``EMAIL_PROVIDER`` value selects a matching send/receive pair.
+# keys identical to those in the email-provider factory so the same
+# provider key can build either a send-side or receive-side instance.
 #
 # NOTE: "sendcloud" maps to a stub parser (SendCloud's inbound webhook
 # payload has not been documented yet) — outbound sending works, inbound
@@ -94,7 +95,7 @@ class WebhookParserFactory:
         if parser_cls is None:
             supported = ", ".join(_PARSERS)
             raise ProviderConfigError(
-                f"Unknown EMAIL_PROVIDER '{provider_name}' for webhook "
+                f"Unknown email provider '{provider_name}' for webhook "
                 f"parsing. Supported providers: {supported}."
             )
         logger.info("Selected inbound webhook parser: %s", key)

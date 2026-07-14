@@ -10,8 +10,11 @@ webhook.
 Configuration consumed (see :class:`src.config.Settings`):
 
 - ``ELASTICEMAIL_API_KEY`` *(required)* – API key with **Send** access.
-- ``FROM_EMAIL`` – verified sender identity.
-- ``COMPANY_NAME`` – display name in the ``From`` header.
+- ``ELASTICEMAIL_OUTBOUND_DOMAIN`` *(required)* – domain used to build the
+  ``From`` and dynamic Reply-To addresses for sends made through Elastic
+  Email.
+- ``ELASTICEMAIL_COMPANY_NAME`` – display name in the ``From`` header
+  (defaults to ``"Your Company"``).
 
 Example:
     >>> from src.email_platform.elasticemail_provider import (

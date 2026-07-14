@@ -9,10 +9,11 @@ Email API takes a plain JSON body. Authentication is HTTP Basic Auth using
 builds the ``Authorization: Basic base64(api_user:api_key)`` header when
 given ``auth=(api_user, api_key)``.
 
-Because the verified subdomain (``INBOUND_DOMAIN``) is fully authenticated,
-EngageLab allows the local-part of the ``from``/``reply_to`` addresses to be
-defined dynamically at send time with no per-address pre-registration — see
-:meth:`EmailMaster.build_dynamic_email`.
+Because the verified subdomain (``ENGAGELAB_OUTBOUND_DOMAIN``) is fully
+authenticated, EngageLab allows the local-part of the ``from``/``reply_to``
+addresses to be defined dynamically at send time with no per-address
+pre-registration — see :meth:`EmailMaster.build_dynamic_email` /
+:meth:`EmailMaster.build_sending_email`.
 
 Configuration consumed (see :class:`src.config.Settings`):
 
@@ -20,7 +21,11 @@ Configuration consumed (see :class:`src.config.Settings`):
   dashboard (Send Settings → API_USER), bound to the sending subdomain.
 - ``ENGAGELAB_API_KEY`` *(required)* – API_KEY generated for that API_USER.
 - ``ENGAGELAB_API_BASE`` – region base URL (Singapore by default).
-- ``COMPANY_NAME`` – display name in the ``from`` header.
+- ``ENGAGELAB_OUTBOUND_DOMAIN`` *(required)* – the verified sending
+  subdomain, used to build the ``From`` and dynamic Reply-To addresses for
+  sends made through EngageLab.
+- ``ENGAGELAB_COMPANY_NAME`` – display name in the ``from`` header (defaults
+  to ``"Your Company"``).
 
 Example:
     >>> from src.email_platform.engagelab_provider import (
@@ -128,7 +133,8 @@ class EngageLabEmailProvider(EmailMaster):
 
         Args:
             from_email (str): Dynamic sender address for the ``from``
-                header (suffix must match the verified ``INBOUND_DOMAIN``).
+                header (suffix must match the verified
+                ``ENGAGELAB_OUTBOUND_DOMAIN``).
             from_name (str): Display name for the ``from`` header.
             to_email (str): Recipient address.
             to_name (str): Recipient display name (unused by the API but

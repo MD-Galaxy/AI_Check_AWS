@@ -30,11 +30,47 @@
 
       <div class="compose-card">
         <div class="compose-card-header">
+          <div class="compose-card-icon">📮</div>
+          <div class="compose-card-title">Email Provider</div>
+        </div>
+        <div class="compose-card-body">
+          <div class="form-grid">
+            <div class="form-group span2">
+              <label for="provider_name">Provider</label>
+              <select id="provider_name" name="provider_name" required onchange="updatePreview()">
+                <option value="">— Select provider —</option>
+                {% for provider in available_providers %}
+                  {% if provider.key=="engagelab" %}
+                    <option value="{{ provider.key }}" selected>{{ provider.label }}</option>
+                  {% else %}
+                    <option value="{{ provider.key }}">{{ provider.label }}</option>
+                  {% endif %}
+                {% endfor %}
+              </select>
+              <span class="label-hint">SendCloud/EngageLab support Chinese and Non-Chinese suppliers, SendGrid only Non-Chinese</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="compose-card">
+        <div class="compose-card-header">
           <div class="compose-card-icon">🏭</div>
           <div class="compose-card-title">Supplier Details</div>
         </div>
         <div class="compose-card-body">
           <div class="form-grid">
+            <div class="form-group span2">
+              <label for="supplier_type">Supplier Type</label>
+              <select id="supplier_type" name="supplier_type" required onchange="updatePreview()">
+                <option value="">— Select supplier type —</option>
+                <option value="chinese">Chinese</option>
+                <option value="non_chinese">Non-Chinese</option>
+              </select>
+              <div class="text-sm" id="type-mismatch-warning" style="display:none; color: var(--danger, #d33); margin-top: 6px;">
+                ⚠️ The selected provider doesn't support this supplier type.
+              </div>
+            </div>
             <div class="form-group">
               <label for="supplier_name">Supplier Name</label>
               <input type="text" id="supplier_name" name="supplier_name" required
@@ -110,9 +146,7 @@
       <div class="preview-body">
         <div class="preview-row">
           <div class="preview-label">From</div>
-          <div class="preview-value mono">
-            {{ current_user.sending_email or "no permanent address assigned yet" }}
-          </div>
+          <div class="preview-value mono" id="prev-from">Select a provider</div>
         </div>
         <div class="preview-row">
           <div class="preview-label">To</div>
@@ -139,8 +173,8 @@
         </div>
         <div class="preview-row">
           <div class="preview-label">Reply address</div>
-          <div class="preview-value mono" style="font-size:11px; color:var(--txt2);">
-            {{ current_user.full_name.split() | map('capitalize') | join('') }}-{thread_id}@{{ inbound_domain or "your-domain" }}
+          <div class="preview-value mono" id="prev-reply" style="font-size:11px; color:var(--txt2);">
+            Select a provider
           </div>
         </div>
       </div>
@@ -160,9 +194,10 @@
 <div style="margin-top: 24px; padding: 16px 20px; background: var(--card); border: 1px solid var(--border); border-radius: var(--r);">
   <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--txt2);">How it works</div>
   <ol style="padding-left: 18px; font-size: 13px; color: var(--txt2); line-height: 1.8;">
+    <li>Pick the email provider to send through, and the supplier's type (Chinese / Non-Chinese) — SendCloud/EngageLab support both, routed through the matching region's URL/credentials, while SendGrid only supports Non-Chinese.</li>
     <li>A unique email address is generated per conversation (encodes your name + a thread ID).</li>
     <li>The RFQ is sent from that address — supplier replies come back to the same address.</li>
-    <li>Your active provider routes inbound replies to <code style="background:var(--bg);padding:1px 5px;border-radius:3px;">/webhooks/inbound</code>, which parses and stores the reply.</li>
+    <li>The configured provider routes inbound replies to <code style="background:var(--bg);padding:1px 5px;border-radius:3px;">/webhooks/inbound</code>, which parses and stores the reply.</li>
     <li>View the full conversation thread on the <a href="{{ base_path }}/tracking">Tracking</a> page.</li>
   </ol>
 </div>
@@ -170,6 +205,24 @@
 <script>
   var fileInput = document.getElementById("attachments");
   var dropzone = document.getElementById("dropzone");
+
+  var PROVIDER_DOMAINS = {
+    {% for provider in available_providers %}
+    "{{ provider.key }}": {{ provider.outbound_domain | tojson }}{{ "," if not loop.last }}
+    {% endfor %}
+  };
+  var PROVIDER_SUPPORTED_TYPES = {
+    {% for provider in available_providers %}
+    "{{ provider.key }}": {{ provider.supported_types | tojson }}{{ "," if not loop.last }}
+    {% endfor %}
+  };
+  var CURRENT_USER_NAME = {{ (current_user.full_name or "") | tojson }};
+
+  function camelName(name) {
+    return (name || "").split(/\s+/).filter(Boolean).map(function (w) {
+      return w.charAt(0).toUpperCase() + w.slice(1);
+    }).join("");
+  }
 
   function updateProjectFields(select) {
     var opt = select.options[select.selectedIndex];
@@ -251,11 +304,31 @@
   });
 
   function updatePreview() {
+    var providerName = document.getElementById("provider_name").value;
+    var supplierType = document.getElementById("supplier_type").value;
     var supplierName = document.getElementById("supplier_name").value.trim();
     var supplierEmail = document.getElementById("supplier_email").value.trim();
     var productName = document.getElementById("product_name").value.trim();
     var quantity = document.getElementById("quantity").value.trim();
     var targetPrice = document.getElementById("target_price").value.trim();
+
+    var domain = providerName ? PROVIDER_DOMAINS[providerName] : "";
+    var camelUser = camelName(CURRENT_USER_NAME);
+
+    var fromEl = document.getElementById("prev-from");
+    fromEl.textContent = (providerName && domain)
+      ? camelUser + "@" + domain
+      : "Select a provider";
+
+    var replyEl = document.getElementById("prev-reply");
+    replyEl.textContent = (providerName && domain)
+      ? camelUser + "-{thread_id}@" + domain
+      : "Select a provider";
+
+    var warningEl = document.getElementById("type-mismatch-warning");
+    var mismatch = providerName && supplierType &&
+      PROVIDER_SUPPORTED_TYPES[providerName].indexOf(supplierType) === -1;
+    warningEl.style.display = mismatch ? "block" : "none";
 
     var toEl = document.getElementById("prev-to");
     if (supplierEmail) {

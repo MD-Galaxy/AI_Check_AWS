@@ -9,10 +9,25 @@ environment lookups.
 
 Configuration is grouped into three concerns:
 
-1. **Global** – ``EMAIL_PROVIDER`` (which provider is active),
-   ``LOG_LEVEL``, ``INBOUND_DOMAIN``, ``FROM_EMAIL`` and ``COMPANY_NAME``.
-2. **Per-provider credentials** – the API keys / domains each provider
-   needs. Only the credentials for the *active* provider are required.
+1. **Global** – ``LOG_LEVEL`` and other app-wide settings.
+2. **Per-provider credentials** – the API keys / outbound domain / display
+   name each provider needs, e.g. ``ENGAGELAB_API_USER``,
+   ``ENGAGELAB_OUTBOUND_DOMAIN``, ``ENGAGELAB_COMPANY_NAME``. There is no
+   single "active" provider anymore — the sender picks a provider per send
+   on the Send RFQ form's "Provider" dropdown plus a "Supplier Type"
+   (Chinese / Non-Chinese); SendCloud and EngageLab both support either
+   type, but SendCloud sends through a wholly separate, region-locked
+   credential pair for Chinese suppliers (``SENDCLOUD_HK_*``, resolved to
+   the internal ``sendcloud_hk`` provider key) vs Non-Chinese
+   (``SENDCLOUD_*``), while SendGrid only supports Non-Chinese (see
+   ``src.route._SEND_KEYS`` and :func:`src.route.send_email_page`); only
+   the credentials for *whichever* resolved provider key is actually used
+   need to be configured. :meth:`Settings.provider_outbound_domain` /
+   :meth:`Settings.provider_company_name` read them generically by
+   provider key so adding a new provider needs no changes here — just its
+   ``{PROVIDER}_*`` env vars, a new :class:`~src.email_platform.email_master.EmailMaster`
+   subclass and a registration in
+   :mod:`src.email_platform.factory`.
 3. **Filesystem paths** – computed relative to the repository root so the
    application behaves the same regardless of the current working
    directory.
@@ -20,8 +35,8 @@ Configuration is grouped into three concerns:
 Example:
     >>> from src.config import get_settings
     >>> settings = get_settings()
-    >>> settings.email_provider
-    'sendgrid'
+    >>> settings.provider_outbound_domain("engagelab")
+    'mail.jobsetu.online'
     >>> settings.attachments_dir.name
     'attachments'
 """
@@ -64,18 +79,8 @@ class Settings:
     webhook parser and the service layer. Treat instances as read-only.
 
     Attributes:
-        email_provider (str): Active provider key — one of ``"sendgrid"``,
-            ``"mailgun"`` or ``"elasticemail"``. Selects both the outbound
-            provider and the inbound webhook parser.
         log_level (str): Logging threshold name, e.g. ``"DEBUG"`` or
             ``"INFO"``. Consumed by :class:`src.logger.AppLogger`.
-        inbound_domain (str): Domain whose MX records point at the provider
-            so that ``*@{inbound_domain}`` mail is delivered to the inbound
-            webhook, e.g. ``"mail.yourdomain.com"``.
-        from_email (str): Verified sender address used in the ``From``
-            header of every outbound RFQ.
-        company_name (str): Display name shown in the ``From`` header and
-            the email signature.
         sendgrid_api_key (str | None): SendGrid API key.
         mailgun_api_key (str | None): Mailgun private API key.
         mailgun_domain (str | None): Mailgun sending domain.
@@ -100,8 +105,8 @@ class Settings:
 
     Example:
         >>> s = Settings()
-        >>> s.email_provider in {"sendgrid", "mailgun", "elasticemail"}
-        True
+        >>> s.provider_outbound_domain("engagelab")
+        'mail.jobsetu.online'
     """
 
     def __init__(self) -> None:
@@ -141,13 +146,7 @@ class Settings:
         )
 
         # ── Global settings ──────────────────────────────────────────
-        self.email_provider = os.getenv(
-            "EMAIL_PROVIDER", "sendgrid"
-        ).strip().lower()
         self.log_level = os.getenv("LOG_LEVEL", "INFO").strip().upper()
-        self.inbound_domain = os.getenv("INBOUND_DOMAIN", "")
-        self.from_email = os.getenv("FROM_EMAIL", "")
-        self.company_name = os.getenv("COMPANY_NAME", "Your Company")
 
         # ── SendGrid credentials ─────────────────────────────────────
         self.sendgrid_api_key = os.getenv("SENDGRID_API_KEY")
@@ -166,7 +165,7 @@ class Settings:
             "ELASTICEMAIL_API_URL", "https://api.elasticemail.com/v4"
         ).rstrip("/")
 
-        # ── SendCloud credentials ─────────────────────────────────────
+        # ── SendCloud credentials (Singapore region — non-Chinese suppliers) ──
         self.sendcloud_api_user = os.getenv("SENDCLOUD_API_USER")
         self.sendcloud_api_key = os.getenv("SENDCLOUD_API_KEY")
         # Singapore region (default): https://api.aurorasendcloud.com
@@ -174,6 +173,19 @@ class Settings:
         # CN (Hong Kong SAR) region: https://api-hk.aurorasendcloud.com
         self.sendcloud_api_base = os.getenv(
             "SENDCLOUD_API_BASE", "https://api.aurorasendcloud.com"
+        ).rstrip("/")
+
+        # ── SendCloud credentials (Hong Kong/CN region — Chinese suppliers) ──
+        # Region-locked: a Singapore apiUser/apiKey pair is rejected against
+        # this base URL and vice versa (see
+        # setup_docs/aurora_send_cloud/AuroraSendCloud_Documentation.md §2),
+        # so this is a wholly separate credential pair from the Singapore one
+        # above, used by :class:`~src.email_platform.sendcloud_provider.SendCloudHKEmailProvider`
+        # when the sender picks SendCloud for a Chinese supplier.
+        self.sendcloud_hk_api_user = os.getenv("SENDCLOUD_HK_API_USER")
+        self.sendcloud_hk_api_key = os.getenv("SENDCLOUD_HK_API_KEY")
+        self.sendcloud_hk_api_base = os.getenv(
+            "SENDCLOUD_HK_API_BASE", "https://api-hk.aurorasendcloud.com"
         ).rstrip("/")
 
         # ── EngageLab credentials ────────────────────────────────────
@@ -202,6 +214,78 @@ class Settings:
         self.static_dir = BASE_DIR / "static"
         self.templates_dir = BASE_DIR / "templates"
         self.db_path = self.data_dir / "db.json"
+
+    # ── Per-provider outbound domain / display name ───────────────────
+    # These are read generically by provider key rather than as fixed
+    # attributes above, so a brand-new provider only needs its
+    # ``{PROVIDER}_OUTBOUND_DOMAIN`` / ``{PROVIDER}_COMPANY_NAME`` env vars
+    # (plus a new EmailMaster subclass registered in
+    # src/email_platform/factory.py) — nothing here has to change.
+
+    def provider_outbound_domain(self, provider_name: str) -> str:
+        """Return the sending domain configured for ``provider_name``.
+
+        Used to build both the per-conversation dynamic Reply-To address
+        and the From address (see
+        :meth:`~src.email_platform.email_master.EmailMaster.build_dynamic_email`
+        / :meth:`~src.email_platform.email_master.EmailMaster.build_sending_email`).
+        Different providers can use different domains, e.g.
+        ``ENGAGELAB_OUTBOUND_DOMAIN`` vs ``SENDCLOUD_OUTBOUND_DOMAIN`` — keep
+        them equal across providers unless the inbound webhook parser is
+        also taught to check every configured domain, since only one
+        provider's parser handles ``POST /webhooks/inbound`` (see
+        :func:`src.app.create_app`).
+
+        Args:
+            provider_name (str): Provider key, e.g. ``"engagelab"``.
+
+        Returns:
+            str: The configured domain, or ``""`` if unset.
+
+        Example:
+            >>> Settings().provider_outbound_domain("engagelab")
+            'mail.jobsetu.online'
+        """
+        return os.getenv(f"{provider_name.strip().upper()}_OUTBOUND_DOMAIN", "")
+
+    def provider_company_name(self, provider_name: str) -> str:
+        """Return the From-header display name configured for ``provider_name``.
+
+        Args:
+            provider_name (str): Provider key, e.g. ``"engagelab"``.
+
+        Returns:
+            str: The configured display name, or ``"Your Company"`` if unset.
+
+        Example:
+            >>> Settings().provider_company_name("engagelab")
+            'JobSetu'
+        """
+        return os.getenv(
+            f"{provider_name.strip().upper()}_COMPANY_NAME", "Your Company"
+        )
+
+    @property
+    def default_outbound_domain(self) -> str:
+        """Best-effort domain for contexts with no provider chosen yet.
+
+        Registration (the permanent ``sending_email`` preview/assignment in
+        :mod:`src.auth.routes`), the dev-bypass "John Carter" shortcut
+        (:mod:`src.auth.dev_bypass`) and generated Message-ID hosts
+        (:meth:`~src.db.repository.Repository._generate_message_id`) all
+        need *some* domain before any provider has been picked on the Send
+        RFQ form. Prefers EngageLab's (the provider with real inbound reply
+        parsing), falling back to SendCloud's — extend this if another
+        provider becomes the preferred default.
+
+        Returns:
+            str: The first configured candidate domain, or ``""`` if none
+                are set.
+        """
+        return (
+            self.provider_outbound_domain("engagelab")
+            or self.provider_outbound_domain("sendcloud")
+        )
 
 
 @lru_cache(maxsize=1)

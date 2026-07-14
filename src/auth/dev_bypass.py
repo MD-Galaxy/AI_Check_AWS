@@ -24,12 +24,12 @@ router = APIRouter()
 
 _JOHN_CARTER_FIRST_NAME = "John"
 _JOHN_CARTER_LAST_NAME = "Carter"
-_JOHN_CARTER_PERSONAL_EMAIL = "john.carter@local.dev"
+_JOHN_CARTER_PERSONAL_EMAIL = "john.carter@mail.ims.com"
 _JOHN_CARTER_LOCAL_PART = "john.carter"
-_FALLBACK_DOMAIN = "local.dev"
+_FALLBACK_DOMAIN = "mail.ims.com"
 
 
-async def _get_or_create_john_carter(repo: Repository, inbound_domain: str) -> dict:
+async def _get_or_create_john_carter(repo: Repository, outbound_domain: str) -> dict:
     """Return the fixed John Carter user, creating and activating it if needed."""
     user = await repo.get_user_auth_by_personal_email(_JOHN_CARTER_PERSONAL_EMAIL)
     if user is None:
@@ -41,7 +41,7 @@ async def _get_or_create_john_carter(repo: Repository, inbound_domain: str) -> d
         )
 
     if user["status"] != "active":
-        sending_email = f"{_JOHN_CARTER_LOCAL_PART}@{inbound_domain or _FALLBACK_DOMAIN}"
+        sending_email = f"{_JOHN_CARTER_LOCAL_PART}@{outbound_domain or _FALLBACK_DOMAIN}"
         try:
             user = await repo.assign_sending_email(user["id"], sending_email)
         except DuplicateSendingEmailError:
@@ -64,7 +64,7 @@ async def login_as_john_carter(request: Request):
         raise HTTPException(status_code=404)
 
     repo: Repository = request.app.state.db
-    user = await _get_or_create_john_carter(repo, settings.inbound_domain)
+    user = await _get_or_create_john_carter(repo, settings.default_outbound_domain)
 
     token = await create_session_for_user(repo, user, request, settings)
     response = RedirectResponse(f"{BASE_PATH}/send", status_code=303)

@@ -7,8 +7,14 @@ ready-to-serve :data:`app` object that Uvicorn imports
 1. Load configuration (:func:`src.config.get_settings`).
 2. Configure the single shared logger from ``LOG_LEVEL``.
 3. Build the async Postgres engine/session factory.
-4. Build the active email provider and inbound webhook parser from
-   ``EMAIL_PROVIDER`` via their factories.
+4. Build the default outbound email provider and the inbound webhook
+   parser (:data:`_INBOUND_EMAIL_PROVIDER`) via their factories. Outbound
+   sending is no longer pinned to one app-wide provider — the sender picks
+   a provider per send on the Send RFQ form (see :mod:`src.route`), and
+   :class:`~src.services.conversation_service.ConversationService` builds
+   the rest on demand. Inbound webhook parsing still needs exactly one
+   fixed parser, since ``POST /webhooks/inbound`` only understands one
+   payload format at a time.
 5. Assemble the :class:`ConversationService`.
 6. Mount static directories, register templates and include the routes.
 
@@ -56,14 +62,24 @@ if str(_BEDROCK_DIR) not in sys.path:
 from app import health as bedrock_health  # noqa: E402
 from app import router as bedrock_router  # noqa: E402
 
+# The only provider with a real inbound webhook parser implemented (see
+# src/webhook_factory/factory.py — SendCloud's is a documented stub).
+# Outbound sending is not limited to this provider: the sender picks any
+# factory-registered provider per send on the Send RFQ form. This fixed
+# choice only governs which payload format the single
+# ``POST /webhooks/inbound`` endpoint understands.
+_INBOUND_EMAIL_PROVIDER = "engagelab"
+
 
 def create_app() -> FastAPI:
     """Build, wire and return the FastAPI application.
 
-    Construction is deliberately eager: if the configured provider is
-    missing credentials, the matching factory raises immediately so the
+    Construction is deliberately eager: if :data:`_INBOUND_EMAIL_PROVIDER`
+    is missing credentials, the matching factory raises immediately so the
     process fails fast at startup with a clear message rather than on the
-    first request.
+    first request. Other providers' credentials are only validated the
+    first time a sender selects them (see
+    :meth:`~src.services.conversation_service.ConversationService.get_provider`).
 
     Returns:
         FastAPI: A fully configured application with static mounts,
@@ -71,8 +87,8 @@ def create_app() -> FastAPI:
             ``app.state``.
 
     Raises:
-        ProviderConfigError: If ``EMAIL_PROVIDER`` is unknown or the active
-            provider's required credentials are not set.
+        ProviderConfigError: If :data:`_INBOUND_EMAIL_PROVIDER` is unknown
+            or missing required configuration.
 
     Example:
         >>> app = create_app()           # doctest: +SKIP
@@ -84,8 +100,8 @@ def create_app() -> FastAPI:
     # 1. Configure the single shared logger from the env-driven level.
     logger = AppLogger.configure(settings.log_level)
     logger.info(
-        "Starting EmailPOC (provider=%s, log_level=%s)",
-        settings.email_provider,
+        "Starting EmailPOC (inbound_provider=%s, log_level=%s)",
+        _INBOUND_EMAIL_PROVIDER,
         settings.log_level,
     )
 
@@ -93,14 +109,14 @@ def create_app() -> FastAPI:
     settings.attachments_dir.mkdir(parents=True, exist_ok=True)
     settings.static_dir.mkdir(parents=True, exist_ok=True)
 
-    # 3. Build infrastructure + the active provider/parser pair.
+    # 3. Build infrastructure + the default provider/parser pair.
     engine, session_factory = create_engine_and_sessionmaker(settings.database_url)
     db = Repository(session_factory, settings, logger)
     email_provider = EmailProviderFactory.create(
-        settings.email_provider, settings, logger
+        _INBOUND_EMAIL_PROVIDER, settings, logger
     )
     webhook_parser = WebhookParserFactory.create(
-        settings.email_provider, settings, logger
+        _INBOUND_EMAIL_PROVIDER, settings, logger
     )
     service = ConversationService(
         db, email_provider, webhook_parser, settings, logger
