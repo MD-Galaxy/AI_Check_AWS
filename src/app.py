@@ -22,6 +22,8 @@ Example:
 """
 
 import sys
+import time
+import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -111,6 +113,41 @@ def create_app() -> FastAPI:
 
     # 4. Assemble the FastAPI app and register everything.
     app = FastAPI(title="EmailPOC", lifespan=lifespan)
+
+    @app.middleware("http")
+    async def log_requests(request: Request, call_next):
+        """Log every request across ALL routes (landing page, EmailPOC,
+        and the mounted Bedrock POC alike) with the real client IP.
+
+        X-Forwarded-For is a chain: each proxy in the path (e.g. the Hong
+        Kong Nginx relay, then the Singapore ALB) appends the IP it saw to
+        the end, so the FIRST entry is the original client and later
+        entries are each relay hop. One line per request, so the
+        ECS/CloudWatch log driver (which ships each stdout line as its own
+        event) never shreds a single request's log into multiple entries.
+        """
+        req_id = uuid.uuid4().hex[:8]
+        forwarded = request.headers.get("x-forwarded-for")
+        client_ip = forwarded.split(",")[0].strip() if forwarded else (
+            request.client.host if request.client else None
+        )
+        start = time.perf_counter()
+        response = await call_next(request)
+        duration_ms = round((time.perf_counter() - start) * 1000, 1)
+        logger.info(
+            "req_id=%s client_ip=%s relay_chain=[%s] method=%s path=%s "
+            "status=%s duration_ms=%s user_agent=\"%s\"",
+            req_id,
+            client_ip,
+            forwarded or "-",
+            request.method,
+            request.url.path,
+            response.status_code,
+            duration_ms,
+            request.headers.get("user-agent"),
+        )
+        return response
+
     app.mount(
         f"{BASE_PATH}/static",
         StaticFiles(directory=str(settings.static_dir)),
