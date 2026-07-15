@@ -37,7 +37,9 @@
           <div class="form-grid">
             <div class="form-group span2">
               <label for="provider_name">Provider</label>
-              <select id="provider_name" name="provider_name" required onchange="updatePreview()">
+              <!-- remove this fardcode input if want to use dropdown -->
+              <input type="hidden" id="provider_name" name="provider_name" value="engagelab">
+              <select id="provider_name_hidden" disabled required onchange="updatePreview()">
                 <option value="">— Select provider —</option>
                 {% for provider in available_providers %}
                   {% if provider.key=="engagelab" %}
