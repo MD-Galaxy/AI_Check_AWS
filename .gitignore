@@ -230,3 +230,4 @@ __marimo__/
 data/attachments/
 data/db.json
 setup_docs/
+.vscode/
