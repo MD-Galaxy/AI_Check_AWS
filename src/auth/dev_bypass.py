@@ -5,8 +5,8 @@ default ``False`` — see :mod:`src.config`). When enabled, ``GET
 /dev/login-john-carter`` skips the login/registration wizard entirely: it
 upserts one fixed "John Carter" user, opens a real session for it exactly
 like :func:`src.auth.routes.login_submit` does, and redirects straight to
-``/send``. With the flag off (the default), the route 404s, so it is not
-reachable at all unless a developer opts in for local use — see
+``/quick-send``. With the flag off (the default), the route 404s, so it is
+not reachable at all unless a developer opts in for local use — see
 ``make john-carter`` in the Makefile.
 """
 
@@ -54,7 +54,7 @@ async def _get_or_create_john_carter(repo: Repository, outbound_domain: str) -> 
 
 @router.get("/dev/login-john-carter")
 async def login_as_john_carter(request: Request):
-    """Log in as John Carter and redirect to the Send RFQ page.
+    """Log in as John Carter and redirect to the Quick Test Send page.
 
     Raises:
         HTTPException: 404 if ``DEV_BYPASS_LOGIN`` is not enabled.
@@ -67,6 +67,6 @@ async def login_as_john_carter(request: Request):
     user = await _get_or_create_john_carter(repo, settings.default_outbound_domain)
 
     token = await create_session_for_user(repo, user, request, settings)
-    response = RedirectResponse(f"{BASE_PATH}/send", status_code=303)
+    response = RedirectResponse(f"{BASE_PATH}/quick-send", status_code=303)
     set_session_cookie(response, token, settings)
     return response

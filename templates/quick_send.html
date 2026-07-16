@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Quick Test Send — EmailPOC{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title">Quick Test Send</div>
+  <div class="page-sub">Pick a provider and supplier type, drop in the destination email, and send a fully pre-filled test RFQ in one click.</div>
+</div>
+
+<style>
+  .qs-section { gap: 8px; }
+  .qs-section label { display: flex; align-items: center; gap: 8px; }
+  .qs-section .qs-type-badge {
+    font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px;
+    text-transform: uppercase; letter-spacing: .04em;
+  }
+  .qs-type-badge.chinese     { background: #FEE2E2; color: #991B1B; }
+  .qs-type-badge.non_chinese { background: #DBEAFE; color: #1E40AF; }
+  .qs-status { min-height: 18px; }
+  .qs-status-ok  { color: var(--success-txt); }
+  .qs-status-err { color: var(--danger-txt); }
+</style>
+
+{% for provider in available_providers %}
+<div class="compose-card">
+  <div class="compose-card-header">
+    <div class="compose-card-icon">📮</div>
+    <div class="compose-card-title">{{ provider.label }}</div>
+  </div>
+  <div class="compose-card-body">
+    <div class="form-grid">
+
+      <div class="form-group qs-section">
+        <label>Chinese <span class="qs-type-badge chinese">CN</span></label>
+        <input type="email" class="qs-email" placeholder="destination@example.com">
+        <button type="button" class="btn btn-primary mt-8"
+                onclick="quickSend('{{ provider.key }}', 'chinese', this)">
+          <span>📤</span> Send with {{ provider.label }} to CN
+        </button>
+        <div class="qs-status text-sm"></div>
+      </div>
+
+      <div class="form-group qs-section">
+        <label>Non-Chinese <span class="qs-type-badge non_chinese">Non-CN</span></label>
+        <input type="email" class="qs-email" placeholder="destination@example.com">
+        <button type="button" class="btn btn-primary mt-8"
+                onclick="quickSend('{{ provider.key }}', 'non_chinese', this)">
+          <span>📤</span> Send with {{ provider.label }} to Non-CN
+        </button>
+        <div class="qs-status text-sm"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+<div style="margin-top: 24px; padding: 16px 20px; background: var(--card); border: 1px solid var(--border); border-radius: var(--r);">
+  <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--txt2);">How it works</div>
+  <ol style="padding-left: 18px; font-size: 13px; color: var(--txt2); line-height: 1.8;">
+    <li>Enter only the destination email in the section for the provider and supplier type you want to test.</li>
+    <li>Supplier name, product, quantity and target price are all filled in with fixed test defaults automatically.</li>
+    <li>Clicking "Send Test RFQ" calls the same <code style="background:var(--bg);padding:1px 5px;border-radius:3px;">POST /send</code> endpoint as the full Send RFQ form.</li>
+    <li>On a successful send, the conversation's tracking page opens automatically in a new tab.</li>
+  </ol>
+</div>
+
+<script>
+  var BASE_PATH = {{ base_path | tojson }};
+  var TYPE_LABELS = { chinese: "Chinese", non_chinese: "Non-Chinese" };
+  var PROVIDER_LABELS = {
+    {% for provider in available_providers %}
+    "{{ provider.key }}": {{ provider.label | tojson }}{{ "," if not loop.last }}
+    {% endfor %}
+  };
+
+  function quickSend(providerKey, supplierType, btn) {
+    var section = btn.closest(".qs-section");
+    var emailInput = section.querySelector(".qs-email");
+    var statusEl = section.querySelector(".qs-status");
+    var email = emailInput.value.trim();
+
+    if (!email) {
+      emailInput.focus();
+      statusEl.className = "qs-status text-sm qs-status-err";
+      statusEl.textContent = "❌ Enter a destination email first.";
+      return;
+    }
+
+    var originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = "<span>⏳</span> Sending…";
+    statusEl.className = "qs-status text-sm";
+    statusEl.textContent = "";
+
+    var providerLabel = PROVIDER_LABELS[providerKey] || providerKey;
+    var typeLabel = TYPE_LABELS[supplierType] || supplierType;
+    var identifier = providerLabel + " - " + typeLabel;
+
+    var formData = new FormData();
+    formData.append("provider_name", providerKey);
+    formData.append("supplier_type", supplierType);
+    formData.append("supplier_email", email);
+    formData.append("supplier_name", "QA Test Supplier (" + identifier + ")");
+    formData.append("product_name", "Quick Test Product (" + identifier + ")");
+    formData.append("quantity", "10");
+    formData.append("target_price", "$10.00");
+    formData.append("project_id", "");
+    formData.append("project_name", "");
+
+    fetch(BASE_PATH + "/send", { method: "POST", body: formData })
+      .then(function (res) {
+        if (res.url && res.url.indexOf("/tracking/") !== -1 && res.url.indexOf("error=") === -1) {
+          window.open(res.url, "_blank", "noopener");
+          statusEl.className = "qs-status text-sm qs-status-ok";
+          statusEl.textContent = "✅ Sent — opened the tracking page in a new tab.";
+        } else {
+          var message = "Send failed.";
+          try {
+            var errParam = new URL(res.url).searchParams.get("error");
+            if (errParam) message = errParam;
+          } catch (e) { /* keep default message */ }
+          statusEl.className = "qs-status text-sm qs-status-err";
+          statusEl.textContent = "❌ " + message;
+        }
+      })
+      .catch(function () {
+        statusEl.className = "qs-status text-sm qs-status-err";
+        statusEl.textContent = "❌ Network error — please try again.";
+      })
+      .finally(function () {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      });
+  }
+</script>
+{% endblock %}
