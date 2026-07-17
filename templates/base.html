@@ -587,8 +587,11 @@
 
     <div class="nav-section">Navigation</div>
 
-    <a href="{{ base_path }}/send" class="nav-item {% if active_page == 'send' %}active{% endif %}">
+    <!-- <a href="{{ base_path }}/send" class="nav-item {% if active_page == 'send' %}active{% endif %}">
       <span class="nav-icon">📤</span> Send Email
+    </a> -->
+    <a href="{{ base_path }}/quick-send" class="nav-item {% if active_page == 'quick_send' %}active{% endif %}">
+      <span class="nav-icon">⚡</span> Quick Test Send
     </a>
     <a href="{{ base_path }}/tracking" class="nav-item {% if active_page == 'tracking' %}active{% endif %}">
       <span class="nav-icon">📥</span> Email Tracking

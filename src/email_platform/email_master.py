@@ -162,7 +162,7 @@ class EmailMaster(ABC):
 
         Converts the user's display name to CamelCase (e.g.
         ``"James Whitfield"`` → ``"JamesWhitfield"``) and combines it with the
-        conversation/thread id via a hyphen so the address is human-readable
+        conversation/thread id via a dot so the address is human-readable
         and the conv_id can be recovered from any reply that arrives there.
         Uses this instance's own :attr:`outbound_domain` — the provider
         selected for this particular send (see
@@ -175,14 +175,14 @@ class EmailMaster(ABC):
 
         Returns:
             str: Fully qualified address, e.g.
-                ``"JamesWhitfield-3fa9c1b2@mail.jobsetu.online"``.
+                ``"JamesWhitfield.3fa9c1b2@mail.jobsetu.online"``.
 
         Example:
             >>> provider.build_dynamic_email("James Whitfield", "3fa9c1b2")
-            'JamesWhitfield-3fa9c1b2@mail.jobsetu.online'
+            'JamesWhitfield.3fa9c1b2@mail.jobsetu.online'
         """
         camel = "".join(word.capitalize() for word in user_name.split())
-        return f"{camel}-{conv_id}@{self.outbound_domain}"
+        return f"{camel}.{conv_id}@{self.outbound_domain}"
 
     def build_sending_email(self, user_name: str) -> str:
         """Construct this provider's stable per-user ``From`` address.
@@ -210,9 +210,11 @@ class EmailMaster(ABC):
     def parse_dynamic_email(self, email_address: str) -> dict | None:
         """Extract ``conv_id`` from a dynamic address.
 
-        Supports two address formats:
+        Supports three address formats:
 
-        * **Current**: ``{CamelCaseName}-{conv_id}@{this provider's outbound_domain}``
+        * **Current**: ``{CamelCaseName}.{conv_id}@{this provider's outbound_domain}``
+          e.g. ``JamesWhitfield.3fa9c1b2@mail.jobsetu.online``
+        * **Legacy** (backward-compat): ``{CamelCaseName}-{conv_id}@{this provider's outbound_domain}``
           e.g. ``JamesWhitfield-3fa9c1b2@mail.jobsetu.online``
         * **Legacy** (backward-compat): ``{prefix}_conv{conv_id}@{this provider's outbound_domain}``
           e.g. ``james.whitfield_conv3fa9c1b2@mail.jobsetu.online``
@@ -229,7 +231,7 @@ class EmailMaster(ABC):
 
         Example:
             >>> provider.parse_dynamic_email(
-            ...     "JamesWhitfield-3fa9c1b2@mail.jobsetu.online")
+            ...     "JamesWhitfield.3fa9c1b2@mail.jobsetu.online")
             {'conv_id': '3fa9c1b2'}
             >>> provider.parse_dynamic_email("nobody@other.com") is None
             True
@@ -243,7 +245,9 @@ class EmailMaster(ABC):
 
         domain = re.escape(self.outbound_domain)
         patterns = [
-            # Current format: CamelCaseName-{8hex}@domain
+            # Current format: CamelCaseName.{8hex}@domain
+            rf"[A-Za-z0-9]+\.([a-f0-9]{{8}})@{domain}(?![\w.-])",
+            # Legacy format: CamelCaseName-{8hex}@domain
             rf"[A-Za-z0-9]+-([a-f0-9]{{8}})@{domain}(?![\w.-])",
             # Legacy format: any_prefix_conv{8hex}@domain
             rf"[a-z0-9._-]+_conv([a-f0-9]{{8}})@{domain}(?![\w.-])",
@@ -259,7 +263,7 @@ class EmailMaster(ABC):
 
         Some mail clients mangle the dynamic ``To`` address when a supplier
         forwards an RFQ instead of replying to it directly (autocomplete or
-        an address-book entry can drop the ``-{conv_id}`` suffix entirely).
+        an address-book entry can drop the ``.{conv_id}`` suffix entirely).
         When that happens the quoted original message is still present in
         the body, including the ``Reference: CONV-{conv_id}`` footer written
         by :meth:`build_rfq_html`, so it is used as a fallback match.

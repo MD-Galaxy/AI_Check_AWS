@@ -138,6 +138,42 @@ async def home(_current_user: dict = Depends(require_login)):
     return RedirectResponse(f"{BASE_PATH}/tracking", status_code=303)
 
 
+@router.get("/quick-send")
+async def quick_send_page(
+    request: Request,
+    current_user: dict = Depends(require_login),
+):
+    """Render the Quick Test Send page.
+
+    A one-click testing surface: one card per provider in
+    :data:`_FORM_PROVIDERS` (SendCloud, EngageLab), each split into a
+    Chinese and a Non-Chinese section. Every section only asks for the
+    destination email — the rest of the RFQ payload (supplier name,
+    product, quantity, target price) is filled in with fixed defaults
+    client-side (see ``templates/quick_send.html``), which then posts to
+    the same ``POST /send`` this module already exposes. On a successful
+    send the page opens the resulting conversation's tracking page
+    (``/tracking/{conv_id}``) in a new tab.
+
+    Args:
+        request (Request): FastAPI request (required by Jinja2).
+        current_user (dict): The logged-in user (sender identity).
+
+    Returns:
+        TemplateResponse: The rendered ``quick_send.html`` template.
+    """
+    templates = request.app.state.templates
+    return templates.TemplateResponse(
+        request,
+        "quick_send.html",
+        {
+            "active_page": "quick_send",
+            "current_user": current_user,
+            "available_providers": _available_providers(request.app.state.settings),
+        },
+    )
+
+
 @router.get("/send")
 async def send_email_page(
     request: Request,

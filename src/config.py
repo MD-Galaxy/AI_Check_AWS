@@ -93,6 +93,8 @@ class Settings:
         sendcloud_api_user (str | None): SendCloud ``API_USER`` credential.
         sendcloud_api_key (str | None): SendCloud ``API_KEY`` credential.
         sendcloud_api_base (str): SendCloud REST base URL (region-specific).
+        sendcloud_hk_outbound_domain (str): Outbound domain for the SendCloud
+            Hong Kong/CN region, independent of ``SENDCLOUD_OUTBOUND_DOMAIN``.
         engagelab_api_user (str | None): EngageLab ``API_USER`` credential.
         engagelab_api_key (str | None): EngageLab ``API_KEY`` credential.
         engagelab_api_base (str): EngageLab REST base URL (region-specific).
@@ -187,6 +189,13 @@ class Settings:
         self.sendcloud_hk_api_base = os.getenv(
             "SENDCLOUD_HK_API_BASE", "https://api-hk.aurorasendcloud.com"
         ).rstrip("/")
+        # Separate outbound domain for the Hong Kong/CN region — independent
+        # of ``SENDCLOUD_OUTBOUND_DOMAIN`` (the Singapore region's domain)
+        # since Chinese suppliers are sent a From/Reply-To address on
+        # whatever domain is verified against the Hong Kong region.
+        self.sendcloud_hk_outbound_domain = os.getenv(
+            "SENDCLOUD_HK_OUTBOUND_DOMAIN", ""
+        )
 
         # ── EngageLab credentials ────────────────────────────────────
         self.engagelab_api_user = os.getenv("ENGAGELAB_API_USER")
